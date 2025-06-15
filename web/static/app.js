@@ -4,30 +4,45 @@ let term;
 let editMode = false;
 let editingAlias = null;
 
-function checkHealth(alias) {
-    const statusEl = document.getElementById(`status-${alias}`);
-    if (statusEl) {
-        statusEl.innerHTML = '⏳ Checking...';
+function checkHealthStatus(alias) {
+    const el = document.getElementById(`status-health-${alias}`);
+    if (el) {
+        el.innerHTML = '⏳ Checking...';
         fetch(`/api/health/${alias}`)
             .then(res => res.json())
-            .then(statusData => {
-                let statusHTML = '';
-
-                if (statusData.connected === true) {
-                    statusHTML = '<span style="color:lime">● Connected</span>';
-                } else if (statusData.status === "online") {
-                    statusHTML = '<span style="color:gold">● Reachable</span>';
+            .then(data => {
+                if (data.status === "online") {
+                    el.innerHTML = '<span style="color:lime">● Online</span>';
                 } else {
-                    statusHTML = '<span style="color:red">● Offline</span>';
+                    el.innerHTML = '<span style="color:red">● Offline</span>';
                 }
-
-                statusEl.innerHTML = statusHTML;
             })
             .catch(() => {
-                statusEl.innerHTML = '<span style="color:red">● Error</span>';
+                el.innerHTML = '<span style="color:red">● Error</span>';
             });
     }
 }
+
+
+function checkConnectionStatus(alias) {
+    const el = document.getElementById(`status-connect-${alias}`);
+    if (el) {
+        el.innerHTML = '⏳ Checking...';
+        fetch(`/api/status/${alias}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.connected) {
+                    el.innerHTML = '<span style="color:deepskyblue">✔ Connected</span>';
+                } else {
+                    el.innerHTML = '<span style="color:gray">✖ Not Connected</span>';
+                }
+            })
+            .catch(() => {
+                el.innerHTML = '<span style="color:red">● Error</span>';
+            });
+    }
+}
+
 
 document.addEventListener("DOMContentLoaded", () => {
     const profileList = document.getElementById("profileList");
@@ -73,7 +88,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     // profileList.appendChild(card);
 
                     // Immediately check health
-                    checkHealth(alias);
+                    checkHealthStatus(alias);
+                    checkConnectionStatus(alias);
+                    //checkHealth(alias);
                     // Then periodically every 30 seconds
                     setInterval(() => checkHealth(alias), 30000);
 
