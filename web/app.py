@@ -400,20 +400,74 @@ def inject_key(alias):
 
     except Exception as e:
         return {"error": str(e)}
+'''
+@app.route("/api/execute_command/<alias>", methods=["POST"])
+def execute_command(alias):
+    data = request.get_json()
+    alias = data.get("alias")
+    command_b64 = data.get("command")
 
-@app.post("/api/execute_command/<alias>")
-def execute_command(alias: str, data: dict):
-    command = data.get("command")
-    if not command:
-        return {"error": "No command provided."}
+    if not alias or not command_b64:
+        return {"error": "Alias and command required"}, 400
 
-    profiles = load_profiles()
-    profile = profiles.get(alias)
-    if not profile:
-        return {"error": "Profile not found"}
+    try:
+        decoded_command = base64.b64decode(command_b64).decode()
+    except Exception as e:
+        return {"error": f"Base64 decode failed: {str(e)}"}, 400
 
     try:
         manager = SSHManager()
+
+        if alias not in manager.sessions:
+            profiles = load_profiles()
+            profile = profiles.get(alias)
+            if not profile:
+                return {"error": "Profile not found"}, 404
+
+            manager.connect(
+                alias=alias,
+                host=profile["host"],
+                port=profile.get("port", 22),
+                username=profile["username"],
+                password=profile.get("password"),
+                key_file=profile.get("key_file")
+            )
+
+        client = manager.sessions[alias]
+        #stdin, stdout, stderr = client.exec_command(decoded_command)
+        #result = stdout.read().decode() + stderr.read().decode()
+
+        channel = manager.shells.get(alias)
+        if not channel:
+            return {"error": "No active shell for alias"}, 400
+
+        channel.send(decoded_command + "\n")
+        time.sleep(0.5)  # Let command execute
+        output = ""
+        while channel.recv_ready():
+            output += channel.recv(4096).decode()
+
+        return {"output": result}
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+'''
+@app.route("/api/execute_command/<alias>", methods=["POST"])
+def execute_command(alias):
+    data = request.get_json()
+    command = data.get("command")
+
+    if not command:
+        return {"error": "Command is required"}, 400
+
+    try:
+        manager = SSHManager()
+        profiles = load_profiles()
+        profile = profiles.get(alias)
+
+        if not profile:
+            return {"error": f"Profile '{alias}' not found"}, 404
+
         manager.connect(
             alias=alias,
             host=profile["host"],
@@ -422,11 +476,15 @@ def execute_command(alias: str, data: dict):
             password=profile.get("password"),
             key_file=profile.get("key_file")
         )
-        result = manager.run_command(alias, command)
+
+        client = manager.sessions[alias]
+        stdin, stdout, stderr = client.exec_command(command)
+        result = stdout.read().decode() + stderr.read().decode()
         manager.close(alias)
-        return result
+
+        return {"output": result}
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": str(e)}, 500
 
 
 @app.route("/api/execute_b64", methods=["POST"])

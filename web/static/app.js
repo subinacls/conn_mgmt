@@ -60,6 +60,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     const col = document.createElement("div");
                     col.className = "col-12 col-sm-6 col-md-4 col-lg-3 d-flex align-items-stretch";
 
+                    const jumpInfo = info.jumpHost    ? `<br><span class="text-warning">🛰️ Jump via: <code>${info.jumpHost}</code></span>`    : "";
+
+
                     const card = document.createElement("div");
                     card.className = "card bg-secondary text-white h-100 p-3";
                     card.style.minHeight = "200px";  // or adjust to 250px, etc.
@@ -71,6 +74,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     card.innerHTML += `
                         <strong>${alias}</strong> → ${info.host}:${info.port} (${info.username})
+                        ${jumpInfo}
                         <div class="d-flex justify-content-between mt-1 mb-2">
                             <div id="status-health-${alias}">🔄 Checking...</div>
                             <div id="status-connect-${alias}">🔄 Checking...</div>
@@ -488,6 +492,21 @@ function promptAndExecute(alias) {
     });
 }
 
+
+
+function sendCommand(alias, scriptText) {
+    const encoded = btoa(scriptText);
+    fetch("/api/execute_command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alias: alias, command: encoded })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert("Output:\n" + (data.output || data.error));
+    })
+    .catch(err => alert("Error: " + err));
+}
 
 function promptAndSendScript(alias) {
     const rawScript = prompt("Paste your bash function/script below:");

@@ -10,6 +10,7 @@ os.makedirs(SESSION_DIR, exist_ok=True)
 class SSHManager:
     def __init__(self):
         self.sessions = {}  # key: alias, value: paramiko.SSHClient
+        self.shells = {}  # key: alias, value: invoke_shell() channel
 
     def start_session(self, alias, config):
         port = config.get("port", 22)
@@ -113,6 +114,8 @@ class SSHManager:
 
         channel = client.invoke_shell()
         print("[+] Shell opened. Interactive session begins.")
+
+        self.shells[alias] = channel
 
         if elevate:
             channel.send("sudo -i\n")
