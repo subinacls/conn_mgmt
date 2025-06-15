@@ -227,18 +227,20 @@ class SSHManager:
         return client._sftp_client
 
     def inject_authorized_key(self, ssh_client, public_key: str):
-        sftp = ssh_client.open_sftp()
-        try:
-            home = sftp.normalize(".")
-            ssh_dir = f"{home}/.ssh"
-            ak_path = f"{ssh_dir}/authorized_keys"
+        """
+        Injects public key without using SFTP and avoids duplicates.
+        """
+        escaped_key = public_key.replace('"', '\\"')
+        check_cmd = f'grep -qxF "{escaped_key}" ~/.ssh/authorized_keys'
+        append_cmd = (
+            f'mkdir -p ~/.ssh && chmod 700 ~/.ssh && '
+            f'echo "{escaped_key}" >> ~/.ssh/authorized_keys && '
+            f'chmod 600 ~/.ssh/authorized_keys'
+        )
 
-            try:
-                sftp.mkdir(ssh_dir, mode=0o700)
-            except IOError:
-                pass  # Directory likely exists
-
-            with sftp.open(ak_path, "a") as f:
-                f.write(f"\n{public_key.strip()}\n")
-        finally:
-            sftp.close()
+        stdin, stdout, stderr = ssh_client.exec_command(check_cmd)
+        if stdout.channel.recv_exit_status() != 0:
+            ssh_client.exec_command(append_cmd)
+            return "injected"
+        else:
+            return "exists"

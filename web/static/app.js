@@ -83,7 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             <button class="btn btn-sm btn-info w-100" onclick="downloadLog('${alias}')">Get Log</button>
                             <button class="btn btn-sm btn-danger me-2 w-100" onclick="disconnect('${alias}')">Disconnect</button>
                             <button class="btn btn-sm btn-danger w-100" onclick="deleteProfile('${alias}')">Delete</button>
-                            <button class="btn btn-sm btn-outline-success mt-1 w-100" onclick="injectKey('${alias}')">🔑 Inject Public Key</button>
+                            <button class="btn btn-sm mt-1 w-100" style="background-color: #28a745; color: #fff; font-weight: bold;" onclick="injectKey('${alias}')">🔑 Inject Public Key</button>
                         </div>
                     `;
 
