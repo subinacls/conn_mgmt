@@ -38,6 +38,11 @@ def index():
     profiles = load_profiles()
     return render_template("index.html", profiles=profiles)
 
+@app.route("/api/status/<alias>")
+def connection_status(alias):
+    is_connected = ssh_mgr.is_connected(alias)
+    return jsonify({"connected": is_connected})
+
 @app.route("/api/profiles", methods=["GET"])
 def get_profiles():
     return jsonify(load_profiles())

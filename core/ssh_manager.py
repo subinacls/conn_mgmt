@@ -123,3 +123,14 @@ class SSHManager:
             print(f"[+] Session '{alias}' closed.")
         else:
             print("[-] Alias not found.")
+
+    def is_connected(self, alias):
+        client = self.sessions.get(alias)
+        if not client:
+            return False
+        transport = client.get_transport()
+        return transport is not None and transport.is_active()
+
+    def list_connected_aliases(self):
+        return [alias for alias, client in self.sessions.items()
+                if client.get_transport() and client.get_transport().is_active()]

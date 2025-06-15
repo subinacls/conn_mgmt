@@ -17,6 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     card.innerHTML = `
                         <strong>${alias}</strong> → ${info.host}:${info.port} (${info.username})
                         <div class="mt-2">
+                            <!-- <button class="btn btn-sm btn-primary me-2" onclick="toggleConnection('${alias}', this)">Connect</button> -->
                             <button class="btn btn-sm btn-primary me-2" onclick="connect('${alias}')">Connect</button>
                             <button class="btn btn-sm btn-warning me-2" onclick="attach('${alias}')">Attach</button>
                             <button class="btn btn-sm btn-danger" onclick="disconnect('${alias}')">Disconnect</button>
@@ -93,6 +94,35 @@ document.addEventListener("DOMContentLoaded", () => {
     refreshProfiles();
     refreshSessions();
 });
+
+function toggleConnection(alias, button) {
+    fetch(`/api/status/${alias}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.connected) {
+                // Currently connected — Disconnect
+                fetch(`/api/disconnect/${alias}`, { method: 'POST' })
+                    .then(() => {
+                        button.classList.remove("btn-danger");
+                        button.classList.add("btn-primary");
+                        button.textContent = "Connect";
+                    });
+            } else {
+                // Currently disconnected — Connect
+                fetch(`/api/connect/${alias}`, { method: 'POST' })
+                    .then(res => res.json())
+                    .then(resp => {
+                        if (resp.status === "connected") {
+                            button.classList.remove("btn-primary");
+                            button.classList.add("btn-danger");
+                            button.textContent = "Disconnect";
+                        } else {
+                            alert("Failed to connect: " + (resp.message || "Unknown error"));
+                        }
+                    });
+            }
+        });
+}
 
 function openTerminal(alias) {
     document.getElementById("terminalModal").style.display = "block";
