@@ -73,6 +73,33 @@ def add_profile():
     save_profiles(profiles)
     return jsonify({"message": "Profile saved"}), 200
 
+@app.route("/api/profiles/<alias>", methods=["PUT"])
+def update_profile(alias):
+    data = request.json
+    profiles = load_profiles()
+    if alias not in profiles:
+        return jsonify({"error": "Alias not found"}), 404
+
+    profiles[alias] = {
+        "host": data["host"],
+        "port": data.get("port", 22),
+        "username": data["username"],
+        "password": data.get("password"),
+        "key_file": data.get("key_file"),
+        "gatewayPorts": data.get("gatewayPorts", False),
+        "compression": data.get("compression", False),
+        "agentForwarding": data.get("agentForwarding", False),
+        "x11Forwarding": data.get("x11Forwarding", False),
+        "localForward": data.get("localForward", ""),
+        "remoteForward": data.get("remoteForward", ""),
+        "socksProxy": data.get("socksProxy", ""),
+        "customOptions": data.get("customOptions", ""),
+        "jumpHost": data.get("jumpHost", "")
+    }
+
+    save_profiles(profiles)
+    return jsonify({"message": "Profile updated"}), 200
+
 @app.route("/api/profiles/<alias>", methods=["DELETE"])
 def delete_profile(alias):
     profiles = load_profiles()

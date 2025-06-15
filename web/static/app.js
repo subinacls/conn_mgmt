@@ -1,5 +1,7 @@
 let socket;
 let term;
+let editMode = false;
+let editingAlias = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     const profileList = document.getElementById("profileList");
@@ -21,6 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="mt-2">
                             <button class="btn btn-sm btn-primary me-2" onclick="connect('${alias}')">Connect</button>
                             <button class="btn btn-sm btn-warning me-2" onclick="attach('${alias}')">Attach</button>
+                            <button class="btn btn-sm btn-outline-light me-2" onclick="editProfile('${alias}')">Edit</button>
                             <button class="btn btn-sm btn-info" onclick="downloadLog('${alias}')">Download Log</button>
                             <button class="btn btn-sm btn-danger me-2" onclick="disconnect('${alias}')">Disconnect</button>
                             <button class="btn btn-sm btn-danger" onclick="deleteProfile('${alias}')">Delete</button>
@@ -71,8 +74,11 @@ document.addEventListener("DOMContentLoaded", () => {
             customOptions: document.getElementById("customOptions").value
         };
 
-        fetch("/api/profiles", {
-            method: "POST",
+        const url = editMode ? `/api/profiles/${editingAlias}` : "/api/profiles";
+        const method = editMode ? "PUT" : "POST";
+
+        fetch(url, {
+            method,
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body)
         }).then(res => {
@@ -81,8 +87,9 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             refreshProfiles();
             addForm.reset();
+            editMode = false;
+            editingAlias = null;
         });
-
     });
 
     window.connect = function (alias) {
@@ -125,6 +132,36 @@ document.addEventListener("DOMContentLoaded", () => {
     refreshProfiles();
     refreshSessions();
 });
+
+function editProfile(alias) {
+    fetch("/api/profiles")
+        .then(res => res.json())
+        .then(data => {
+            const profile = data[alias];
+            if (!profile) return alert("Profile not found");
+
+            // Fill the form
+            document.getElementById("alias").value = alias;
+            document.getElementById("host").value = profile.host;
+            document.getElementById("port").value = profile.port;
+            document.getElementById("username").value = profile.username;
+            document.getElementById("password").value = profile.password || "";
+            document.getElementById("key_file").value = profile.key_file || "";
+            document.getElementById("gatewayPorts").checked = !!profile.gatewayPorts;
+            document.getElementById("compression").checked = !!profile.compression;
+            document.getElementById("agentForwarding").checked = !!profile.agentForwarding;
+            document.getElementById("x11Forwarding").checked = !!profile.x11Forwarding;
+            document.getElementById("localForward").value = profile.localForward || "";
+            document.getElementById("remoteForward").value = profile.remoteForward || "";
+            document.getElementById("socksProxy").value = profile.socksProxy || "";
+            document.getElementById("customOptions").value = profile.customOptions || "";
+            document.getElementById("jumpHost").value = profile.jumpHost || "";
+
+            editMode = true;
+            editingAlias = alias;
+        });
+}
+
 
 function downloadLog(alias) {
     window.open(`/api/sessions/logs/${alias}`, "_blank");
