@@ -240,37 +240,21 @@ def on_disconnect():
     channel = active_channels.pop(sid, None)
 
 
-'''
-@app.route("/api/health/<alias>", methods=["GET"])
-def health_check(alias):
-    profiles = load_profiles()
-    profile = profiles.get(alias)
-    if not profile:
-        return jsonify({"error": "Profile not found"}), 404
-
-    host = profile["host"]
-    try:
-        result = subprocess.run(["ping", "-c", "1", "-W", "1", host],
-                                stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL)
-        status = "online" if result.returncode == 0 else "offline"
-    except Exception:
-        status = "offline"
-    return jsonify({"status": status})
-'''
 
 @app.route("/api/health/<alias>")
 def health_check(alias):
-    profiles = load_profiles()  # Fix: load from disk
+    profiles = load_profiles()
     profile = profiles.get(alias)
     if not profile:
         return jsonify({"status": "offline", "error": "Profile not found"}), 404
 
     try:
+        import socket
         ip = profile.get("host")
         port = int(profile.get("port", 22))
-        with socket.create_connection((ip, port), timeout=2):
-            return jsonify({"status": "online"})
+        sock = socket.create_connection((ip, port), timeout=3)
+        sock.close()
+        return jsonify({"status": "online"})
     except Exception as e:
         return jsonify({"status": "offline", "error": str(e)})
 
