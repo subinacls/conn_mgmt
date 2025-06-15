@@ -17,9 +17,26 @@ class SSHManager:
         # Build base SSH command
         cmd = ["xterm", "-T", f"SSH: {alias}", "-e", "ssh"]
 
+        # Jump host (-J)
+        jump = config.get("jumpHost")
+        if jump:
+            cmd += ["-J", jump]
+
         # Gateway ports
         if config.get("gatewayPorts"):
             cmd.append("-g")
+
+        # Compression (-C)
+        if config.get("compression"):
+            cmd.append("-C")
+
+        # Agent forwarding (-A)
+        if config.get("agentForwarding"):
+            cmd.append("-A")
+
+        # X11 forwarding (-X)
+        if config.get("x11Forwarding"):
+            cmd.append("-X")
 
         # Local forwarding
         lf = config.get("localForward")
@@ -31,16 +48,25 @@ class SSHManager:
         if rf:
             cmd += ["-R", rf]
 
-        # SOCKS5 proxy (dynamic port forwarding)
+        # SOCKS5 proxy
         dp = config.get("socksProxy")
         if dp:
             cmd += ["-D", dp]
 
+        # Custom -o options (space-separated list of Option=Value)
+        custom_opts = config.get("customOptions", "")
+        if custom_opts:
+            for opt in custom_opts.strip().split():
+                cmd += ["-o", opt]
+
         # Add user@host and port
         cmd += ["-p", str(port), f"{username}@{host}"]
 
-        print("Launching SSH command:", " ".join(cmd))
-        return subprocess.Popen(cmd).pid
+        # Start the SSH session in a new xterm window
+        subprocess.Popen(cmd)
+
+
+
 
     def attach_session(self, alias):
         # Placeholder for attach functionality

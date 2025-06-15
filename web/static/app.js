@@ -17,10 +17,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     card.innerHTML = `
                         <strong>${alias}</strong> → ${info.host}:${info.port} (${info.username})
                         <div class="mt-2">
-                            <!-- <button class="btn btn-sm btn-primary me-2" onclick="toggleConnection('${alias}', this)">Connect</button> -->
                             <button class="btn btn-sm btn-primary me-2" onclick="connect('${alias}')">Connect</button>
                             <button class="btn btn-sm btn-warning me-2" onclick="attach('${alias}')">Attach</button>
-                            <button class="btn btn-sm btn-danger" onclick="disconnect('${alias}')">Disconnect</button>
+                            <button class="btn btn-sm btn-danger me-2" onclick="disconnect('${alias}')">Disconnect</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteProfile('${alias}')">Delete</button>
                         </div>
                     `;
                     profileList.appendChild(card);
@@ -46,6 +46,41 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
             });
     }
+
+
+    addForm.addEventListener("submit", e => {
+        e.preventDefault();
+        const body = {
+            alias: document.getElementById("alias").value,
+            host: document.getElementById("host").value,
+            port: parseInt(document.getElementById("port").value),
+            username: document.getElementById("username").value,
+            password: document.getElementById("password").value,
+            key_file: document.getElementById("key_file").value,
+            jumpHost: document.getElementById("jumpHost").value,
+            gatewayPorts: document.getElementById("gatewayPorts").checked,
+            compression: document.getElementById("compression").checked,
+            agentForwarding: document.getElementById("agentForwarding").checked,
+            x11Forwarding: document.getElementById("x11Forwarding").checked,
+            localForward: document.getElementById("localForward").value,
+            remoteForward: document.getElementById("remoteForward").value,
+            socksProxy: document.getElementById("socksProxy").value,
+            customOptions: document.getElementById("customOptions").value
+        };
+
+        fetch("/api/profiles", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        }).then(res => {
+            if (!res.ok) {
+                return res.json().then(err => alert("Error: " + err.error));
+            }
+            refreshProfiles();
+            addForm.reset();
+        });
+
+    });
 
     window.connect = function (alias) {
         fetch(`/api/connect/${alias}`, { method: "POST" })
@@ -73,23 +108,15 @@ document.addEventListener("DOMContentLoaded", () => {
         openTerminal(alias);
     };
 
-    addForm.addEventListener("submit", e => {
-        e.preventDefault();
-        const formData = new FormData(addForm);
-        const jsonData = Object.fromEntries(formData.entries());
-        jsonData.port = parseInt(jsonData.port);
-        fetch("/api/profiles", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(jsonData)
-        })
-            .then(res => res.json())
-            .then(resp => alert(resp.message || resp.error))
-            .then(() => {
-                addForm.reset();
-                refreshProfiles();
-            });
-    });
+    window.deleteProfile = function (alias) {
+        if (confirm(`Are you sure you want to delete the profile '${alias}'? This action cannot be undone.`)) {
+            fetch(`/api/profiles/${alias}`, { method: "DELETE" })
+                .then(() => {
+                    alert(`Profile '${alias}' deleted.`);
+                    refreshProfiles();
+                });
+        }
+    };
 
     refreshProfiles();
     refreshSessions();
@@ -100,7 +127,6 @@ function toggleConnection(alias, button) {
         .then(res => res.json())
         .then(data => {
             if (data.connected) {
-                // Currently connected — Disconnect
                 fetch(`/api/disconnect/${alias}`, { method: 'POST' })
                     .then(() => {
                         button.classList.remove("btn-danger");
@@ -108,7 +134,6 @@ function toggleConnection(alias, button) {
                         button.textContent = "Connect";
                     });
             } else {
-                // Currently disconnected — Connect
                 fetch(`/api/connect/${alias}`, { method: 'POST' })
                     .then(res => res.json())
                     .then(resp => {
@@ -138,7 +163,6 @@ function openTerminal(alias) {
     term.focus();
 
     socket = io();
-
     socket.emit("start_session", { alias });
 
     socket.on("shell_output", (data) => {

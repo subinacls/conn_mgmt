@@ -32,25 +32,52 @@
         <div class="mb-4">
             <form id="addForm" class="row g-3">
                 <div class="col-md-2">
-                    <input class="form-control" name="alias" placeholder="Alias" required>
+                <input id="alias" class="form-control" name="alias" placeholder="Alias" required>
                 </div>
                 <div class="col-md-2">
-                    <input class="form-control" name="host" placeholder="Host" required>
+                <input id="host" class="form-control" name="host" placeholder="Host" required>
                 </div>
                 <div class="col-md-1">
-                    <input class="form-control" name="port" type="number" placeholder="Port" value="22">
+                <input id="port" class="form-control" name="port" type="number" placeholder="Port" value="22">
                 </div>
                 <div class="col-md-2">
-                    <input class="form-control" name="username" placeholder="Username" required>
+                <input id="username" class="form-control" name="username" placeholder="Username" required>
                 </div>
                 <div class="col-md-2">
-                    <input class="form-control" name="password" placeholder="Password">
+                <input id="password" class="form-control" name="password" placeholder="Password">
                 </div>
                 <div class="col-md-2">
-                    <input class="form-control" name="key_file" placeholder="Private Key (opt)">
+                <input id="key_file" class="form-control" name="key_file" placeholder="Private Key (opt)">
                 </div>
-                <div class="col-md-1">
-                    <button class="btn btn-success w-100">Add</button>
+            
+                <!-- Advanced SSH Options -->
+                <div class="col-md-12 mt-2">
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" id="gatewayPorts">
+                    <label class="form-check-label" for="gatewayPorts">Gateway Ports (-g)</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" id="compression">
+                    <label class="form-check-label" for="compression">Compression (-C)</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" id="agentForwarding">
+                    <label class="form-check-label" for="agentForwarding">Agent Forwarding (-A)</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" id="x11Forwarding">
+                    <label class="form-check-label" for="x11Forwarding">X11 Forwarding (-X)</label>
+                </div>
+
+                <input class="form-control mt-2" id="jumpHost" placeholder="Jump Host (e.g. user@bastion)">
+                <input class="form-control mt-2" id="localForward" placeholder="Local Forward (e.g. 8080:localhost:80)">
+                <input class="form-control mt-2" id="remoteForward" placeholder="Remote Forward (e.g. 2222:localhost:22)">
+                <input class="form-control mt-2" id="socksProxy" placeholder="SOCKS5 Proxy (e.g. 1080)">
+                <input class="form-control mt-2" id="customOptions" placeholder='Custom SSH Options (-o), e.g. ServerAliveInterval=60'>
+                </div>
+            
+                <div class="col-md-1 mt-3">
+                <button class="btn btn-success w-100">Add</button>
                 </div>
             </form>
         </div>

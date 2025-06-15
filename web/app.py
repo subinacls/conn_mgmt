@@ -1,7 +1,6 @@
 import eventlet
 eventlet.monkey_patch()
 
-
 from flask import Flask, request, render_template, jsonify
 from flask_socketio import SocketIO, emit
 import traceback
@@ -16,12 +15,11 @@ from core.ssh_manager import SSHManager
 
 app = Flask(__name__)
 CONFIG_FILE = os.path.expanduser("~/.ssh_connections.json")
-#socketio = SocketIO(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 ssh_mgr = SSHManager()
 active_channels = {}      # { sid: channel }
 background_sessions = {}  # { alias: channel }
-session_logs = {}  # { alias: [lines] }
+session_logs = {}         # { alias: [lines] }
 
 def load_profiles():
     if os.path.exists(CONFIG_FILE):
@@ -60,10 +58,28 @@ def add_profile():
         "port": data.get("port", 22),
         "username": data["username"],
         "password": data.get("password"),
-        "key_file": data.get("key_file")
+        "key_file": data.get("key_file"),
+        "jumpHost": data.get("jumpHost", ""),
+        "gatewayPorts": data.get("gatewayPorts", False),
+        "localForward": data.get("localForward", ""),
+        "remoteForward": data.get("remoteForward", ""),
+        "socksProxy": data.get("socksProxy", ""),
+        "compression": data.get("compression", False),
+        "agentForwarding": data.get("agentForwarding", False),
+        "x11Forwarding": data.get("x11Forwarding", False),
+        "customOptions": data.get("customOptions", "")
     }
     save_profiles(profiles)
     return jsonify({"message": "Profile saved"}), 200
+
+@app.route("/api/profiles/<alias>", methods=["DELETE"])
+def delete_profile(alias):
+    profiles = load_profiles()
+    if alias in profiles:
+        del profiles[alias]
+        save_profiles(profiles)
+        return "", 204
+    return jsonify({"error": "Alias not found"}), 404
 
 @app.route("/api/connect/<alias>", methods=["POST"])
 def connect_profile(alias):
@@ -162,7 +178,6 @@ def reattach_session(data):
         channel = background_sessions[alias]
         active_channels[sid] = channel
 
-        # Send saved log history first
         for line in session_logs.get(alias, []):
             socketio.emit('shell_output', {'output': line}, to=sid)
 
@@ -190,7 +205,6 @@ def reattach_session(data):
 def on_disconnect():
     sid = request.sid
     channel = active_channels.pop(sid, None)
-    # Don't close the channel; it's stored in background_sessions
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5050, debug=True)
