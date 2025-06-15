@@ -134,6 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
             username: document.getElementById("username").value,
             password: document.getElementById("password").value,
             key_file: document.getElementById("key_file").value,
+            key_text: document.getElementById("key_text").value,
             jumpHost: document.getElementById("jumpHost").value,
             gatewayPorts: document.getElementById("gatewayPorts").checked,
             compression: document.getElementById("compression").checked,
@@ -218,6 +219,7 @@ function editProfile(alias) {
             document.getElementById("username").value = profile.username;
             document.getElementById("password").value = profile.password || "";
             document.getElementById("key_file").value = profile.key_file || "";
+            document.getElementById("key_text").value = profile.key_text || "";
             document.getElementById("gatewayPorts").checked = !!profile.gatewayPorts;
             document.getElementById("compression").checked = !!profile.compression;
             document.getElementById("agentForwarding").checked = !!profile.agentForwarding;

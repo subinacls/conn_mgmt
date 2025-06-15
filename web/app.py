@@ -61,6 +61,7 @@ def add_profile():
         "username": data["username"],
         "password": data.get("password"),
         "key_file": data.get("key_file"),
+        "key_text": data.get("key_text", ""),
         "jumpHost": data.get("jumpHost", ""),
         "gatewayPorts": data.get("gatewayPorts", False),
         "localForward": data.get("localForward", ""),

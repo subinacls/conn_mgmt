@@ -22,8 +22,16 @@ class SSHManager:
             #cmd += ["-o", f"ProxyCommand=ssh -W %h:%p {jump}"]
             cmd += ["-J", jump]
 
+        key_text = config.get("key_text", "").strip()
         key_file = config.get("key_file")
-        if key_file:
+
+        if key_text:
+            temp_key_path = os.path.join(SESSION_DIR, f"{alias}_id.key")
+            with open(temp_key_path, "w") as keyfile:
+                keyfile.write(key_text)
+            os.chmod(temp_key_path, 0o600)
+            cmd += ["-i", temp_key_path]
+        elif key_file:
             cmd += ["-i", key_file]
 
         # Gateway ports
