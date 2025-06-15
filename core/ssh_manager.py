@@ -204,3 +204,12 @@ class SSHManager:
     def list_connected_aliases(self):
         return [alias for alias, client in self.sessions.items()
                 if client.get_transport() and client.get_transport().is_active()]
+
+    def get_sftp(self, alias):
+        """Return an SFTP client tied to the existing SSH session."""
+        if alias not in self.sessions:
+            raise ValueError(f"No active session for alias: {alias}")
+        client = self.sessions[alias]
+        if not hasattr(client, "_sftp_client") or client._sftp_client is None:
+            client._sftp_client = client.open_sftp()
+        return client._sftp_client

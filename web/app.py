@@ -7,6 +7,7 @@ import traceback
 import threading
 import time
 import select
+import stat
 import paramiko
 import os
 import json
@@ -205,6 +206,56 @@ def reattach_session(data):
 def on_disconnect():
     sid = request.sid
     channel = active_channels.pop(sid, None)
+
+
+@app.route("/api/sftp/list", methods=["POST"])
+def sftp_list():
+    data = request.json
+    alias = data.get("alias")
+    path = data.get("path", ".")
+    try:
+        sftp = ssh_mgr.get_sftp(alias)
+        files = []
+        for entry in sftp.listdir_attr(path):
+            files.append({
+                "filename": entry.filename,
+                "longname": entry.longname,
+                "size": entry.st_size,
+                "mtime": entry.st_mtime,
+                "isdir": stat.S_ISDIR(entry.st_mode)
+            })
+        return jsonify({"files": files})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/sftp/download", methods=["GET"])
+def sftp_download():
+    alias = request.args.get("alias")
+    path = request.args.get("path")
+    try:
+        sftp = ssh_mgr.get_sftp(alias)
+        with sftp.file(path, 'rb') as f:
+            data = f.read()
+        filename = os.path.basename(path)
+        return app.response_class(data, mimetype="application/octet-stream",
+                                  headers={"Content-Disposition": f"attachment; filename={filename}"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/sftp/upload", methods=["POST"])
+def sftp_upload():
+    alias = request.form.get("alias")
+    path = request.form.get("path")  # full target path on remote
+    file = request.files["file"]
+    try:
+        sftp = ssh_mgr.get_sftp(alias)
+        with sftp.file(path, 'wb') as f:
+            f.write(file.read())
+        return jsonify({"message": "Upload successful"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5050, debug=True)

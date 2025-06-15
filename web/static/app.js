@@ -6,6 +6,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const sessionList = document.getElementById("sessionList");
     const addForm = document.getElementById("addForm");
 
+    populateSFTPAliases()
+
     function refreshProfiles() {
         fetch("/api/profiles")
             .then(res => res.json())
@@ -192,4 +194,84 @@ function closeTerminal() {
     }
     document.getElementById("terminalModal").style.display = "none";
     refreshSessions();
+}
+
+
+function listRemote() {
+    const alias = document.getElementById("sftpAlias").value;
+    const path = document.getElementById("sftpPath").value;
+
+    fetch("/api/sftp/list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alias, path })
+    })
+    .then(res => res.json())
+    .then(data => {
+        const sftpList = document.getElementById("sftpList");
+        sftpList.innerHTML = "";
+        if (data.files) {
+            data.files.forEach(file => {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>${file.isdir ? "📁" : "📄"} ${file.filename}</td>
+                    <td>${file.isdir ? "-" : file.size}</td>
+                    <td>${new Date(file.mtime * 1000).toLocaleString()}</td>
+                    <td>
+                        ${!file.isdir ? `<button class="btn btn-sm btn-success" onclick="downloadFile('${alias}', '${path}/${file.filename}')">Download</button>` : ""}
+                    </td>
+                `;
+                sftpList.appendChild(row);
+            });
+        } else {
+            alert("Failed to list directory: " + data.error);
+        }
+    });
+}
+
+function downloadFile(alias, fullPath) {
+    const url = `/api/sftp/download?alias=${encodeURIComponent(alias)}&path=${encodeURIComponent(fullPath)}`;
+    window.open(url, "_blank");
+}
+
+function uploadFile() {
+    const alias = document.getElementById("sftpAlias").value;
+    const path = document.getElementById("sftpPath").value;
+    const fileInput = document.getElementById("uploadFile");
+    const file = fileInput.files[0];
+    if (!file) return alert("No file selected");
+
+    const formData = new FormData();
+    formData.append("alias", alias);
+    formData.append("path", `${path}/${file.name}`);
+    formData.append("file", file);
+
+    fetch("/api/sftp/upload", {
+        method: "POST",
+        body: formData
+    })
+    .then(res => res.json())
+    .then(resp => {
+        if (resp.message) {
+            alert("Upload successful");
+            listRemote();  // refresh
+        } else {
+            alert("Upload failed: " + resp.error);
+        }
+    });
+}
+
+function populateSFTPAliases() {
+    fetch("/api/profiles")
+        .then(res => res.json())
+        .then(data => {
+            const sftpAlias = document.getElementById("sftpAlias");
+            sftpAlias.innerHTML = "";
+            Object.keys(data).forEach(alias => {
+                const opt = document.createElement("option");
+                opt.value = alias;
+                opt.textContent = alias;
+                sftpAlias.appendChild(opt);
+            });
+        });
 }
