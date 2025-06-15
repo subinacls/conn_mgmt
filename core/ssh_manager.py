@@ -2,9 +2,53 @@ import paramiko
 import os
 import subprocess
 
+SESSION_DIR = "/tmp/ssh_sessions"
+os.makedirs(SESSION_DIR, exist_ok=True)
+
 class SSHManager:
     def __init__(self):
         self.sessions = {}  # key: alias, value: paramiko.SSHClient
+
+    def start_session(self, alias, config):
+        host = config["host"]
+        port = config.get("port", 22)
+        username = config["username"]
+
+        # Build base SSH command
+        cmd = ["xterm", "-T", f"SSH: {alias}", "-e", "ssh"]
+
+        # Gateway ports
+        if config.get("gatewayPorts"):
+            cmd.append("-g")
+
+        # Local forwarding
+        lf = config.get("localForward")
+        if lf:
+            cmd += ["-L", lf]
+
+        # Remote forwarding
+        rf = config.get("remoteForward")
+        if rf:
+            cmd += ["-R", rf]
+
+        # SOCKS5 proxy (dynamic port forwarding)
+        dp = config.get("socksProxy")
+        if dp:
+            cmd += ["-D", dp]
+
+        # Add user@host and port
+        cmd += ["-p", str(port), f"{username}@{host}"]
+
+        print("Launching SSH command:", " ".join(cmd))
+        return subprocess.Popen(cmd).pid
+
+    def attach_session(self, alias):
+        # Placeholder for attach functionality
+        print(f"Attach requested for {alias}")
+
+
+
+
 
     def connect(self, alias, host, port=22, username=None, password=None, key_file=None):
         if alias in self.sessions:
