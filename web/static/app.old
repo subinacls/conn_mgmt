@@ -36,14 +36,11 @@ document.addEventListener("DOMContentLoaded", () => {
             .then(data => {
                 profileList.innerHTML = "";
                 Object.entries(data).forEach(([alias, info]) => {
-
-                    const col = document.createElement("div");
-                    col.className = "col-12 col-sm-6 col-md-4 col-lg-3 d-flex align-items-stretch";
-
+                    const statusRes = await fetch(`/api/status/${alias}`);
+                    const statusData = await statusRes.json();
+                    const isConnected = statusData.connected;
                     const card = document.createElement("div");
-                    card.className = "card bg-secondary text-white h-100 p-3";
-                    card.style.minHeight = "200px";  // or adjust to 250px, etc.
-
+                    card.className = "card bg-secondary text-white p-2 mb-2";
                     const statusSpan = document.createElement("span");
                     statusSpan.id = `status-${alias}`;
                     statusSpan.innerHTML = '⏳ Checking...';
@@ -51,20 +48,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     card.innerHTML += `
                         <strong>${alias}</strong> → ${info.host}:${info.port} (${info.username})
-                        <div class="mt-2 d-grid gap-2">
-                            <button class="btn btn-sm btn-primary me-2 w-100" onclick="connect('${alias}')">Connect</button>
-                            <button class="btn btn-sm btn-warning me-2 w-100" onclick="attach('${alias}')">Attach</button>
-                            <button class="btn btn-sm btn-outline-light me-2 w-100" onclick="editProfile('${alias}')">Edit</button>
-                            <button class="btn btn-sm btn-info w-100" onclick="downloadLog('${alias}')">Get Log</button>
-                            <button class="btn btn-sm btn-danger me-2 w-100" onclick="disconnect('${alias}')">Disconnect</button>
-                            <button class="btn btn-sm btn-danger w-100" onclick="deleteProfile('${alias}')">Delete</button>
+                        <div class="mt-2">
+                            <button class="btn btn-sm ${isConnected ? 'btn-danger' : 'btn-success'} me-2" onclick="toggleConnection('${alias}', this)">
+                                ${isConnected ? 'Disconnect' : 'Connect'}
+                            </button>
+                            <button class="btn btn-sm btn-warning me-2" onclick="attach('${alias}')">Attach</button>
+                            <button class="btn btn-sm btn-outline-light me-2" onclick="editProfile('${alias}')">Edit</button>
+                            <button class="btn btn-sm btn-info" onclick="downloadLog('${alias}')">Download Log</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteProfile('${alias}')">Delete</button>
                         </div>
                     `;
 
-                    col.appendChild(card);
-                    profileList.appendChild(col);
-
-                    // profileList.appendChild(card);
+                    profileList.appendChild(card);
 
                     // Immediately check health
                     checkHealth(alias);
@@ -222,34 +217,21 @@ function downloadLog(alias) {
 }
 
 function toggleConnection(alias, button) {
-    button.disabled = true;
-    button.textContent = "Processing...";
     fetch(`/api/status/${alias}`)
-        .then(res => res.json())
         .then(res => res.json())
         .then(data => {
             if (data.connected) {
                 fetch(`/api/disconnect/${alias}`, { method: 'POST' })
                     .then(() => {
-                        button.classList.remove("btn-danger");
-                        button.classList.add("btn-primary");
-                        button.textContent = "Connect";
-                        button.disabled = false;
+                        refreshProfiles();  // <- re-render
+                        refreshSessions();
                     });
             } else {
                 fetch(`/api/connect/${alias}`, { method: 'POST' })
-                    .then(res => res.json())
-                    .then(resp => {
-                        if (resp.status === "connected") {
-                            button.classList.remove("btn-primary");
-                            button.classList.add("btn-danger");
-                            button.textContent = "Disconnect";
-                            button.disabled = false;
-                        } else {
-                            alert("Failed to connect: " + (resp.message || "Unknown error"));
-                            button.disabled = false;
-                            button.textContent = "Connect";
-                        }
+                    .then(() => {
+                        refreshProfiles();  // <- re-render
+                        refreshSessions();
+                        openTerminal(alias);
                     });
             }
         });
