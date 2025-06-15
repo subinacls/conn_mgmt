@@ -85,6 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             <button class="btn btn-sm btn-danger w-100" onclick="deleteProfile('${alias}')">Delete</button>
                             <button class="btn btn-sm mt-1 w-100" style="background-color: #28a745; color: #fff; font-weight: bold;" onclick="injectKey('${alias}')">🔑 Inject Public Key</button>
                             <button class="btn btn-sm btn-outline-warning mt-1 w-100" onclick="promptAndExecute('${alias}')">🖥️ Run Command</button>
+                            <button class="btn btn-sm btn-outline-warning mt-1 w-100" onclick="promptExecuteScript('${alias}')">⚙️ Run Bash Script</button>
                         </div>
                     `;
 
@@ -506,5 +507,27 @@ function promptAndSendScript(alias) {
         } else {
             alert(`✅ Output:\n${result.output || '(no output)'}\n\n❌ Errors:\n${result.error || '(none)'}`);
         }
+    });
+}
+
+
+function executeBase64Script(alias, rawScript) {
+    const b64script = btoa(rawScript);
+    fetch("/api/execute_b64", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alias, b64script }),
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) {
+            alert("❌ Error:\n" + data.error);
+        } else {
+            alert("✅ Output:\n" + data.output + (data.error ? "\n\n⚠️ Stderr:\n" + data.error : ""));
+        }
+    })
+    .catch(err => {
+        console.error("Error executing script:", err);
+        alert("❌ Failed to execute script.");
     });
 }

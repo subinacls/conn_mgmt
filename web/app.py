@@ -15,6 +15,15 @@ import socket
 
 from core.ssh_manager import SSHManager
 
+
+from pydantic import BaseModel
+import base64
+
+class BashScriptPayload(BaseModel):
+    alias: str
+    b64script: str
+
+
 app = Flask(__name__)
 CONFIG_FILE = os.path.expanduser("~/.ssh_connections.json")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
@@ -420,6 +429,42 @@ def execute_command(alias: str, data: dict):
         return {"error": str(e)}
 
 
+@app.route("/api/execute_b64", methods=["POST"])
+def execute_b64_script():
+    try:
+        data = request.get_json()
+        alias = data.get("alias")
+        b64script = data.get("b64script")
+
+        profiles = load_profiles()
+        profile = profiles.get(alias)
+        if not profile:
+            return jsonify({"error": "Profile not found"}), 404
+
+        # Decode the script
+        script = base64.b64decode(b64script).decode()
+        encoded_command = f"bash -c {repr(script)}"
+
+        manager = SSHManager()
+        manager.connect(
+            alias=alias,
+            host=profile["host"],
+            port=profile.get("port", 22),
+            username=profile["username"],
+            password=profile.get("password"),
+            key_file=profile.get("key_file")
+        )
+
+        client = manager.sessions[alias]
+        stdin, stdout, stderr = client.exec_command(encoded_command)
+        out = stdout.read().decode().strip()
+        err = stderr.read().decode().strip()
+        manager.close(alias)
+
+        return jsonify({"output": out, "error": err})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.post("/api/run_b64_script/<alias>")
 def run_b64_script(alias: str, data: dict):
@@ -447,7 +492,6 @@ def run_b64_script(alias: str, data: dict):
         return result
     except Exception as e:
         return {"error": str(e)}
-
 
 
 

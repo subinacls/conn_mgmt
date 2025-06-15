@@ -271,3 +271,4 @@ class SSHManager:
         output = stdout.read().decode().strip()
         error = stderr.read().decode().strip()
         return {"output": output, "error": error}
+
