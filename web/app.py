@@ -392,8 +392,61 @@ def inject_key(alias):
     except Exception as e:
         return {"error": str(e)}
 
+@app.post("/api/execute_command/<alias>")
+def execute_command(alias: str, data: dict):
+    command = data.get("command")
+    if not command:
+        return {"error": "No command provided."}
+
+    profiles = load_profiles()
+    profile = profiles.get(alias)
+    if not profile:
+        return {"error": "Profile not found"}
+
+    try:
+        manager = SSHManager()
+        manager.connect(
+            alias=alias,
+            host=profile["host"],
+            port=profile.get("port", 22),
+            username=profile["username"],
+            password=profile.get("password"),
+            key_file=profile.get("key_file")
+        )
+        result = manager.run_command(alias, command)
+        manager.close(alias)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
 
 
+
+@app.post("/api/run_b64_script/<alias>")
+def run_b64_script(alias: str, data: dict):
+    b64_script = data.get("b64")
+    if not b64_script:
+        return {"error": "No base64 payload provided."}
+
+    profiles = load_profiles()
+    profile = profiles.get(alias)
+    if not profile:
+        return {"error": "Profile not found"}
+
+    try:
+        manager = SSHManager()
+        manager.connect(
+            alias=alias,
+            host=profile["host"],
+            port=profile.get("port", 22),
+            username=profile["username"],
+            password=profile.get("password"),
+            key_file=profile.get("key_file")
+        )
+        result = manager.run_b64_script(alias, b64_script)
+        manager.close(alias)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
 
 
 

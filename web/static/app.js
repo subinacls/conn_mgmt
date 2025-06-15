@@ -84,6 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             <button class="btn btn-sm btn-danger me-2 w-100" onclick="disconnect('${alias}')">Disconnect</button>
                             <button class="btn btn-sm btn-danger w-100" onclick="deleteProfile('${alias}')">Delete</button>
                             <button class="btn btn-sm mt-1 w-100" style="background-color: #28a745; color: #fff; font-weight: bold;" onclick="injectKey('${alias}')">🔑 Inject Public Key</button>
+                            <button class="btn btn-sm btn-outline-warning mt-1 w-100" onclick="promptAndExecute('${alias}')">🖥️ Run Command</button>
                         </div>
                     `;
 
@@ -461,5 +462,49 @@ function injectKey(alias) {
     .catch(err => {
         console.error("Error injecting key:", err);
         alert("❌ Error injecting key");
+    });
+}
+
+function promptAndExecute(alias) {
+    const command = prompt(`Enter bash command to run on ${alias}`);
+    if (!command) return;
+
+    fetch(`/api/execute_command/${alias}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command })
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.error) {
+            alert(`❌ Error: ${result.error}`);
+        } else {
+            alert(`✅ Output:\n${result.output || '(no output)'}\n\n❌ Errors:\n${result.error || '(none)'}`);
+        }
+    })
+    .catch(err => {
+        alert("Request failed: " + err);
+    });
+}
+
+
+function promptAndSendScript(alias) {
+    const rawScript = prompt("Paste your bash function/script below:");
+    if (!rawScript) return;
+
+    const b64 = btoa(rawScript);
+
+    fetch(`/api/run_b64_script/${alias}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ b64 })
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.error) {
+            alert(`❌ Error: ${result.error}`);
+        } else {
+            alert(`✅ Output:\n${result.output || '(no output)'}\n\n❌ Errors:\n${result.error || '(none)'}`);
+        }
     });
 }

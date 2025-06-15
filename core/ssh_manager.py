@@ -1,6 +1,8 @@
 import paramiko
 import os
 import subprocess
+import uuid
+import base64
 
 SESSION_DIR = "/tmp/ssh_sessions"
 os.makedirs(SESSION_DIR, exist_ok=True)
@@ -244,3 +246,28 @@ class SSHManager:
             return "injected"
         else:
             return "exists"
+
+    def run_command(self, alias, command: str):
+        if alias not in self.sessions:
+            raise Exception("No active session found for alias.")
+        client = self.sessions[alias]
+        stdin, stdout, stderr = client.exec_command(command)
+        output = stdout.read().decode().strip()
+        error = stderr.read().decode().strip()
+        return {"output": output, "error": error}
+
+
+    def run_b64_script(self, alias, b64_script: str):
+        if alias not in self.sessions:
+            raise Exception("No active session found for alias.")
+        client = self.sessions[alias]
+        script_content = base64.b64decode(b64_script).decode()
+
+        # Write script to remote temp file
+        filename = f"/tmp/{uuid.uuid4().hex}.sh"
+        commands = f"echo {b64_script} | base64 -d > {filename} && chmod +x {filename} && bash {filename}; rm -f {filename}"
+
+        stdin, stdout, stderr = client.exec_command(commands)
+        output = stdout.read().decode().strip()
+        error = stderr.read().decode().strip()
+        return {"output": output, "error": error}
