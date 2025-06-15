@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SSH Connection Manager</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <!-- xterm.js -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css">
+    <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+    <!-- socket.io -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body class="p-4">
+    <h2>SSH Profiles</h2>
+    <div id="profileList" class="mb-3"></div>
+
+    <h4>Add New Profile</h4>
+    <form id="addForm" class="row g-2 mb-4">
+        <input class="form-control" name="alias" placeholder="Alias" required>
+        <input class="form-control" name="host" placeholder="Host" required>
+        <input class="form-control" name="port" placeholder="Port" value="22">
+        <input class="form-control" name="username" placeholder="Username" required>
+        <input class="form-control" name="password" placeholder="Password">
+        <input class="form-control" name="key_file" placeholder="Private Key Path">
+        <button class="btn btn-success mt-2" type="submit">Save Profile</button>
+    </form>
+
+    <button class="btn btn-dark" onclick="openTerminal()">Open Terminal</button>
+
+    <div style="position:absolute; top:10px; right:10px; z-index:1000;">
+      <button onclick="bgSession()" style="margin-right:5px;">Background</button>
+      <button onclick="closeSession()" style="margin-right:5px;">Close</button>
+    </div>
+
+    <!-- Terminal Modal -->
+    <div id="terminalModal" style="display:none;position:fixed;top:5%;left:5%;width:90%;height:80%;background:#000;z-index:1000;padding:10px;">
+      <button onclick="closeTerminal()" style="float:right;" class="btn btn-danger btn-sm">Close</button>
+      <div id="terminal" style="height:95%; width:100%"></div>
+    </div>
+
+    <script>
+        function bgSession() {
+            socket.emit("background_session");
+            term.write("\r\n[Session backgrounded]\r\n");
+            socket.disconnect(); // 🔁 Optional: disconnect WS to simulate background
+        }
+
+        function closeSession() {
+            if (socket) socket.emit("close_session");
+            term.write("\r\n[Session closed]\r\n");
+            // ✅ Dispose the terminal
+            term.dispose();
+            // ✅ Remove the terminal from DOM
+            const terminalContainer = document.getElementById("terminal");
+            terminalContainer.innerHTML = "";
+            // ✅ Optionally disconnect WebSocket
+            if (socket) socket.disconnect();
+            // ✅ Optional: reload to reset state
+            // location.reload();
+        }
+    </script>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

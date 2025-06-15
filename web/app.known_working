@@ -1,0 +1,83 @@
+import eventlet
+eventlet.monkey_patch()
+
+from flask import Flask, render_template, request
+from flask_socketio import SocketIO, emit
+import paramiko
+import select
+import threading
+
+app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+#socketio = SocketIO(app)
+active_channels = {}
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+@socketio.on("start_session")
+def start_session():
+    sid = request.sid
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        # 🔁 REPLACE with your real credentials
+        ssh.connect(
+            hostname="10.20.0.1",
+            port=22,
+            username="ubuntu",
+            password="SpirentComm2025!",  # ⚠️ Use a testing password only here
+            look_for_keys=False,
+            allow_agent=False
+        )
+        transport = ssh.get_transport()
+        channel = transport.open_session()
+        channel.get_pty(term='xterm', width=120, height=40)
+        channel.invoke_shell()
+
+        active_channels[sid] = channel
+
+        def read_from_channel():
+            try:
+                while True:
+                    if sid not in active_channels:
+                        break
+                    r, _, _ = select.select([channel], [], [], 0.1)
+                    if r:
+                        data = channel.recv(4096).decode("utf-8", errors="ignore")
+                        socketio.emit("shell_output", data, to=sid)
+            except Exception as e:
+                socketio.emit("shell_output", f"[ERROR: {e}]\n", to=sid)
+
+        threading.Thread(target=read_from_channel, daemon=True).start()
+
+    except Exception as e:
+        emit("shell_output", f"[ERROR] Connection failed: {e}\n")
+
+@socketio.on("shell_input")
+def shell_input(data):
+    sid = request.sid
+    print(f"[shell_input] from {sid}: {repr(data)}")  # ✅ server debug
+    channel = active_channels.get(sid)
+    if channel:
+        try:
+            sent = channel.send(data)
+            print(f"[channel.send] sent {sent} bytes")  # ✅ confirm send
+        except Exception as e:
+            print(f"[ERROR sending to shell] {e}")
+            emit("shell_output", f"[ERROR sending data] {e}\n", to=sid)
+
+@socketio.on("disconnect")
+def disconnect():
+    sid = request.sid
+    channel = active_channels.pop(sid, None)
+    if channel:
+        try:
+            channel.close()
+        except:
+            pass
+
+if __name__ == "__main__":
+    socketio.run(app, host="0.0.0.0", port=5050, debug=True)

@@ -1,0 +1,77 @@
+from flask import Flask, request, jsonify, render_template
+from core.ssh_manager import SSHManager
+import traceback
+import json
+import os
+
+app = Flask(__name__)
+CONFIG_FILE = os.path.expanduser("~/.ssh_connections.json")
+ssh_mgr = SSHManager()
+
+def load_profiles():
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, 'r') as f:
+            return json.load(f)
+    return {}
+
+def save_profiles(profiles):
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(profiles, f, indent=2)
+
+@app.route("/")
+def index():
+    profiles = load_profiles()
+    return render_template("index.html", profiles=profiles)
+
+@app.route("/api/profiles", methods=["GET"])
+def get_profiles():
+    return jsonify(load_profiles())
+
+@app.route("/api/profiles", methods=["POST"])
+def add_profile():
+    data = request.json
+    profiles = load_profiles()
+    alias = data['alias']
+    if alias in profiles:
+        return jsonify({"error": "Alias already exists"}), 409
+
+    profiles[alias] = {
+        "host": data["host"],
+        "port": data.get("port", 22),
+        "username": data["username"],
+        "password": data.get("password"),
+        "key_file": data.get("key_file")
+    }
+    save_profiles(profiles)
+    return jsonify({"message": "Profile saved"}), 200
+
+@app.route("/api/connect/<alias>", methods=["POST"])
+def connect_profile(alias):
+    profiles = load_profiles()
+    profile = profiles.get(alias)
+    if not profile:
+        return jsonify({"error": "Profile not found"}), 404
+    try:
+        ssh_mgr.connect(
+            alias=alias,
+            host=profile['host'],
+            port=profile.get('port', 22),
+            username=profile['username'],
+            password=profile.get('password'),
+            key_file=profile.get('key_file')
+        )
+        return jsonify({"message": f"Connected to {alias}"})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/disconnect/<alias>", methods=["POST"])
+def disconnect_profile(alias):
+    try:
+        ssh_mgr.close(alias)
+        return jsonify({"message": f"Disconnected {alias}"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5050, debug=True)
