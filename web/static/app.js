@@ -11,14 +11,20 @@ function checkHealth(alias) {
         fetch(`/api/health/${alias}`)
             .then(res => res.json())
             .then(statusData => {
-                if (statusData.status === "online") {
-                    statusEl.innerHTML = '<span style="color:lime">● Online</span> ';
+                let statusHTML = '';
+
+                if (statusData.connected === true) {
+                    statusHTML = '<span style="color:lime">● Connected</span>';
+                } else if (statusData.status === "online") {
+                    statusHTML = '<span style="color:gold">● Reachable</span>';
                 } else {
-                    statusEl.innerHTML = '<span style="color:red">● Offline</span> ';
+                    statusHTML = '<span style="color:red">● Offline</span>';
                 }
+
+                statusEl.innerHTML = statusHTML;
             })
             .catch(() => {
-                statusEl.innerHTML = '<span style="color:red">● Error</span> ';
+                statusEl.innerHTML = '<span style="color:red">● Error</span>';
             });
     }
 }

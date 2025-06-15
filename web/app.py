@@ -11,6 +11,7 @@ import stat
 import paramiko
 import os
 import json
+import socket
 
 from core.ssh_manager import SSHManager
 
@@ -249,7 +250,6 @@ def health_check(alias):
         return jsonify({"status": "offline", "error": "Profile not found"}), 404
 
     try:
-        import socket
         ip = profile.get("host")
         port = int(profile.get("port", 22))
         sock = socket.create_connection((ip, port), timeout=3)
@@ -257,6 +257,16 @@ def health_check(alias):
         return jsonify({"status": "online"})
     except Exception as e:
         return jsonify({"status": "offline", "error": str(e)})
+
+    try:
+        # Check SSH session state
+        connected = ssh_mgr.is_connected(alias)
+        return jsonify({
+            "status": status,
+            "connected": connected
+        })
+    except Exception as e:
+        return jsonify({"status": "Connection status failed", "error": str(e)})
 
 @app.route("/api/sftp/list", methods=["POST"])
 def sftp_list():
