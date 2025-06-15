@@ -225,3 +225,16 @@ class SSHManager:
         if not hasattr(client, "_sftp_client") or client._sftp_client is None:
             client._sftp_client = client.open_sftp()
         return client._sftp_client
+
+    def inject_authorized_key(self, ssh_client, public_key: str):
+        sftp = ssh_client.open_sftp()
+        try:
+            try:
+                sftp.mkdir(".ssh", mode=0o700)
+            except IOError:
+                pass  # Already exists
+            ak_path = ".ssh/authorized_keys"
+            with sftp.open(ak_path, "a") as f:
+                f.write(f"\n{public_key}\n")
+        finally:
+            sftp.close()

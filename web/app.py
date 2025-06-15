@@ -323,6 +323,29 @@ def get_session_log(alias):
         return app.response_class(log_text, mimetype="text/plain")
     return jsonify({"error": "No logs found"}), 404
 
+@app.post("/api/inject_key/{alias}")
+def inject_key(alias: str):
+    profiles = load_profiles()
+    profile = profiles.get(alias)
+    if not profile:
+        return {"error": "Profile not found"}
+
+    key_path = os.path.expanduser("~/.ssh/id_rsa.pub")
+    if not os.path.exists(key_path):
+        return {"error": "No public key found at ~/.ssh/id_rsa.pub"}
+
+    with open(key_path, "r") as f:
+        pub_key = f.read().strip()
+
+    try:
+        manager = SSHManager(profile)
+        manager.connect()
+        manager.inject_authorized_key(pubkey)
+        manager.close()
+        return {"message": f"Public key injected into {alias}"}
+    except Exception as e:
+        return {"error": str(e)}
+
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5050, debug=True)

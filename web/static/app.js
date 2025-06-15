@@ -83,6 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             <button class="btn btn-sm btn-info w-100" onclick="downloadLog('${alias}')">Get Log</button>
                             <button class="btn btn-sm btn-danger me-2 w-100" onclick="disconnect('${alias}')">Disconnect</button>
                             <button class="btn btn-sm btn-danger w-100" onclick="deleteProfile('${alias}')">Delete</button>
+                            <button class="btn btn-sm btn-outline-success mt-1 w-100" onclick="injectKey('${alias}')">🔑 Inject Public Key</button>
                         </div>
                     `;
 
@@ -441,3 +442,15 @@ function showDetails(alias) {
         });
 }
 
+
+function injectKey(alias) {
+    fetch(`/api/inject_key/${alias}`, { method: "POST" })
+        .then(res => res.json())
+        .then(resp => {
+            alert(resp.message || resp.error || "Unknown error");
+        })
+        .catch(err => {
+            console.error("Inject Key Error:", err);
+            alert("Failed to inject key.");
+        });
+}
