@@ -21,6 +21,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 ssh_mgr = SSHManager()
 active_channels = {}      # { sid: channel }
 background_sessions = {}  # { alias: channel }
+session_logs = {}  # { alias: [lines] }
 
 def load_profiles():
     if os.path.exists(CONFIG_FILE):
@@ -147,30 +148,38 @@ def on_shell_input(data):
         except Exception as e:
             emit("shell_output", f"[ERROR: send] {e}\n")
 
-@socketio.on("reattach_session")
+@socketio.on('reattach_session')
 def reattach_session(data):
-    session_id = data.get("session_id")
+    alias = data.get('alias')
     sid = request.sid
 
-    channel = background_sessions.get(session_id)
-    if not channel:
-        emit("shell_output", "[ERROR] Session not found or expired\n")
-        return
+    if alias in background_sessions:
+        channel = background_sessions[alias]
+        active_channels[sid] = channel
 
-    active_channels[sid] = channel
+        # Send saved log history first
+        for line in session_logs.get(alias, []):
+            socketio.emit('shell_output', {'output': line}, to=sid)
 
-    def read_output():
-        try:
-            while sid in active_channels and channel:
-                r, _, _ = select.select([channel], [], [], 0.1)
-                if r:
-                    data = channel.recv(1024).decode("utf-8", errors="ignore")
-                    socketio.emit("shell_output", data, to=sid)
-        except Exception as e:
-            socketio.emit("shell_output", f"[ERROR: recv_loop] {e}\n", to=sid)
+        def forward_output():
+            try:
+                while True:
+                    rlist, _, _ = select.select([channel], [], [], 0.1)
+                    if channel in rlist:
+                        output = channel.recv(1024).decode()
+                        if output:
+                            session_logs[alias].append(output)
+                            socketio.emit('shell_output', {'output': output}, to=sid)
+            except Exception as e:
+                print(f"Error during reattach forward_output: {e}")
 
-    threading.Thread(target=read_output, daemon=True).start()
+        thread = threading.Thread(target=forward_output)
+        thread.daemon = True
+        thread.start()
 
+        emit('shell_output', {'output': f"Reattached to session '{alias}'\n"})
+    else:
+        emit('shell_output', {'output': f"No backgrounded session found for '{alias}'\n"})
 
 @socketio.on("disconnect")
 def on_disconnect():
