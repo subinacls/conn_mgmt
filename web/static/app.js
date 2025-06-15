@@ -4,6 +4,25 @@ let term;
 let editMode = false;
 let editingAlias = null;
 
+function checkHealth(alias) {
+    const statusEl = document.getElementById(`status-${alias}`);
+    if (statusEl) {
+        statusEl.innerHTML = '⏳ Checking...';
+        fetch(`/api/health/${alias}`)
+            .then(res => res.json())
+            .then(statusData => {
+                if (statusData.status === "online") {
+                    statusEl.innerHTML = '<span style="color:lime">● Online</span> ';
+                } else {
+                    statusEl.innerHTML = '<span style="color:red">● Offline</span> ';
+                }
+            })
+            .catch(() => {
+                statusEl.innerHTML = '<span style="color:red">● Error</span> ';
+            });
+    }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const profileList = document.getElementById("profileList");
     const sessionList = document.getElementById("sessionList");
@@ -19,7 +38,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 Object.entries(data).forEach(([alias, info]) => {
                     const card = document.createElement("div");
                     card.className = "card bg-secondary text-white p-2 mb-2";
-                    
                     const statusSpan = document.createElement("span");
                     statusSpan.id = `status-${alias}`;
                     statusSpan.innerHTML = '⏳ Checking...';
@@ -38,6 +56,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     `;
 
                     profileList.appendChild(card);
+
+                    // Immediately check health
+                    checkHealth(alias);
+                    // Then periodically every 30 seconds
+                    setInterval(() => checkHealth(alias), 30000);
 
                     fetch(`/api/health/${alias}`)
                         .then(res => res.json())
