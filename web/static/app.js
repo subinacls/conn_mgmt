@@ -156,7 +156,7 @@ document.addEventListener("DOMContentLoaded", () => {
             body: JSON.stringify(body)
         }).then(res => {
             if (!res.ok) {
-                return res.json().then(err => alert("Error: " + err.error));
+                return res.json().then(err => alert("❌ Error: " + err.error));
             }
             refreshProfiles();
             addForm.reset();
@@ -266,7 +266,7 @@ function toggleConnection(alias, button) {
                             button.classList.add("btn-danger");
                             button.textContent = "Disconnect";
                         } else {
-                            alert("Failed to connect: " + (resp.message || "Unknown error"));
+                            alert("❌ Failed to connect: " + (resp.message || "Unknown error"));
                         }
                         button.disabled = false;
                         checkConnectionStatus(alias);
@@ -348,7 +348,7 @@ function listRemote() {
                 sftpList.appendChild(row);
             });
         } else {
-            alert("Failed to list directory: " + data.error);
+            alert("❌ Failed to list directory: " + data.error);
         }
     });
 }
@@ -380,7 +380,7 @@ function uploadFile() {
             alert("Upload successful");
             listRemote();  // refresh
         } else {
-            alert("Upload failed: " + resp.error);
+            alert("❌ Upload failed: " + resp.error);
         }
     });
 }
@@ -453,7 +453,7 @@ function injectKey(alias) {
     .then(res => res.json())
     .then(data => {
         if (data.message) {
-            alert(`✅ ${data.message}`);
+            alert(` ${data.message}`);
         } else {
             alert(`❌ Failed to inject key: ${data.error || 'Unknown error'}`);
         }

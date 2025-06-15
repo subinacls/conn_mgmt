@@ -323,8 +323,8 @@ def get_session_log(alias):
         return app.response_class(log_text, mimetype="text/plain")
     return jsonify({"error": "No logs found"}), 404
 
-@app.post("/api/inject_key/{alias}")
-def inject_key(alias: str):
+@app.route("/api/inject_key/<alias>", methods=["POST"])
+def inject_key(alias):
     profiles = load_profiles()
     profile = profiles.get(alias)
     if not profile:
