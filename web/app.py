@@ -1,3 +1,7 @@
+import eventlet
+eventlet.monkey_patch()
+
+
 from flask import Flask, request, render_template, jsonify
 from flask_socketio import SocketIO, emit
 import traceback
@@ -12,7 +16,8 @@ from core.ssh_manager import SSHManager
 
 app = Flask(__name__)
 CONFIG_FILE = os.path.expanduser("~/.ssh_connections.json")
-socketio = SocketIO(app)
+#socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 ssh_mgr = SSHManager()
 active_channels = {}      # { sid: channel }
 background_sessions = {}  # { alias: channel }
