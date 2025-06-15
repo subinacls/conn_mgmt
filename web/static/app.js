@@ -77,6 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         </div>
                         <div class="mt-2 d-grid gap-2">
                             <button class="btn btn-sm btn-primary me-2 w-100" onclick="connect('${alias}')">Connect</button>
+                            <button class="btn btn-sm btn-dark w-100" onclick="showDetails('${alias}')">Details 🔍</button>
                             <button class="btn btn-sm btn-warning me-2 w-100" onclick="attach('${alias}')">Attach</button>
                             <button class="btn btn-sm btn-outline-light me-2 w-100" onclick="editProfile('${alias}')">Edit</button>
                             <button class="btn btn-sm btn-info w-100" onclick="downloadLog('${alias}')">Get Log</button>
@@ -393,6 +394,48 @@ function populateSFTPAliases() {
                 opt.textContent = alias;
                 sftpAlias.appendChild(opt);
             });
+        });
+}
+
+function showDetails(alias) {
+    fetch("/api/profiles")
+        .then(res => res.json())
+        .then(data => {
+            const profile = data[alias];
+            if (!profile) return alert("Profile not found");
+
+            let cmd = `ssh `;
+
+            if (profile.key_file) {
+                cmd += `-i ${profile.key_file} `;
+            }
+            if (profile.jumpHost) {
+                cmd += `-J ${profile.jumpHost} `;
+            }
+            if (profile.gatewayPorts) {
+                cmd += `-g `;
+            }
+            if (profile.compression) {
+                cmd += `-C `;
+            }
+            if (profile.agentForwarding) {
+                cmd += `-A `;
+            }
+            if (profile.x11Forwarding) {
+                cmd += `-X `;
+            }
+            if (profile.customOptions) {
+                cmd += `-o ${profile.customOptions} `;
+            }
+
+            cmd += `${profile.username}@${profile.host}`;
+            if (profile.port && profile.port !== 22) {
+                cmd += ` -p ${profile.port}`;
+            }
+
+            document.getElementById("detailsContent").textContent = cmd;
+            const modal = new bootstrap.Modal(document.getElementById("detailsModal"));
+            modal.show();
         });
 }
 

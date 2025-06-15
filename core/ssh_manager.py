@@ -10,7 +10,6 @@ class SSHManager:
         self.sessions = {}  # key: alias, value: paramiko.SSHClient
 
     def start_session(self, alias, config):
-        host = config["host"]
         port = config.get("port", 22)
         username = config["username"]
 
@@ -20,7 +19,12 @@ class SSHManager:
         # Jump host (-J)
         jump = config.get("jumpHost")
         if jump:
+            #cmd += ["-o", f"ProxyCommand=ssh -W %h:%p {jump}"]
             cmd += ["-J", jump]
+
+        key_file = config.get("key_file")
+        if key_file:
+            cmd += ["-i", key_file]
 
         # Gateway ports
         if config.get("gatewayPorts"):
