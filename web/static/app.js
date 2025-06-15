@@ -1,3 +1,4 @@
+
 let socket;
 let term;
 let editMode = false;
@@ -18,7 +19,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 Object.entries(data).forEach(([alias, info]) => {
                     const card = document.createElement("div");
                     card.className = "card bg-secondary text-white p-2 mb-2";
-                    card.innerHTML = `
+                    
+                    const statusSpan = document.createElement("span");
+                    statusSpan.id = `status-${alias}`;
+                    statusSpan.innerHTML = '⏳ Checking...';
+                    card.appendChild(statusSpan);
+
+                    card.innerHTML += `
                         <strong>${alias}</strong> → ${info.host}:${info.port} (${info.username})
                         <div class="mt-2">
                             <button class="btn btn-sm btn-primary me-2" onclick="connect('${alias}')">Connect</button>
@@ -29,7 +36,19 @@ document.addEventListener("DOMContentLoaded", () => {
                             <button class="btn btn-sm btn-danger" onclick="deleteProfile('${alias}')">Delete</button>
                         </div>
                     `;
+
                     profileList.appendChild(card);
+
+                    fetch(`/api/health/${alias}`)
+                        .then(res => res.json())
+                        .then(statusData => {
+                            const el = document.getElementById(`status-${alias}`);
+                            if (el) {
+                                el.innerHTML = statusData.status === "online"
+                                    ? '<span style="color:lime">● Online</span> '
+                                    : '<span style="color:red">● Offline</span> ';
+                            }
+                        });
                 });
             });
     }
@@ -52,6 +71,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
             });
     }
+
+
+
 
 
     addForm.addEventListener("submit", e => {
@@ -318,3 +340,4 @@ function populateSFTPAliases() {
             });
         });
 }
+
