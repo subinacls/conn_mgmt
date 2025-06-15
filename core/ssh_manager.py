@@ -229,12 +229,16 @@ class SSHManager:
     def inject_authorized_key(self, ssh_client, public_key: str):
         sftp = ssh_client.open_sftp()
         try:
+            home = sftp.normalize(".")
+            ssh_dir = f"{home}/.ssh"
+            ak_path = f"{ssh_dir}/authorized_keys"
+
             try:
-                sftp.mkdir(".ssh", mode=0o700)
+                sftp.mkdir(ssh_dir, mode=0o700)
             except IOError:
-                pass  # Already exists
-            ak_path = ".ssh/authorized_keys"
+                pass  # Directory likely exists
+
             with sftp.open(ak_path, "a") as f:
-                f.write(f"\n{public_key}\n")
+                f.write(f"\n{public_key.strip()}\n")
         finally:
             sftp.close()

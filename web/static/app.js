@@ -443,14 +443,23 @@ function showDetails(alias) {
 }
 
 
+
 function injectKey(alias) {
-    fetch(`/api/inject_key/${alias}`, { method: "POST" })
-        .then(res => res.json())
-        .then(resp => {
-            alert(resp.message || resp.error || "Unknown error");
-        })
-        .catch(err => {
-            console.error("Inject Key Error:", err);
-            alert("Failed to inject key.");
-        });
+    if (!confirm(`Inject your public key into '${alias}'?`)) return;
+
+    fetch(`/api/inject_key/${alias}`, {
+        method: "POST"
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.message) {
+            alert(`✅ ${data.message}`);
+        } else {
+            alert(`❌ Failed to inject key: ${data.error || 'Unknown error'}`);
+        }
+    })
+    .catch(err => {
+        console.error("Error injecting key:", err);
+        alert("❌ Error injecting key");
+    });
 }

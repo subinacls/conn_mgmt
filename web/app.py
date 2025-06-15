@@ -338,14 +338,23 @@ def inject_key(alias: str):
         pub_key = f.read().strip()
 
     try:
-        manager = SSHManager(profile)
-        manager.connect()
-        manager.inject_authorized_key(pubkey)
-        manager.close()
-        return {"message": f"Public key injected into {alias}"}
+        manager = SSHManager()
+        manager.connect(
+            alias=alias,
+            host=profile["host"],
+            port=profile.get("port", 22),
+            username=profile["username"],
+            password=profile.get("password"),
+            key_file=profile.get("key_file")
+        )
+        client = manager.sessions[alias]
+        manager.inject_authorized_key(client, pub_key)
+        manager.close(alias)
+        return {"message": f"✅ Public key injected into {alias}"}
     except Exception as e:
         return {"error": str(e)}
 
-
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5050, debug=True)
+
+
