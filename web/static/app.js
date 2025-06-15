@@ -7,38 +7,37 @@ let editingAlias = null;
 function checkHealthStatus(alias) {
     const el = document.getElementById(`status-health-${alias}`);
     if (el) {
-        el.innerHTML = '⏳ Checking...';
+        el.innerHTML = '🔄 Checking...';
         fetch(`/api/health/${alias}`)
             .then(res => res.json())
             .then(data => {
                 if (data.status === "online") {
-                    el.innerHTML = '<span style="color:lime">● Online</span>';
+                    el.innerHTML = '🟢 <span style="color:lime">Online</span>';
                 } else {
-                    el.innerHTML = '<span style="color:red">● Offline</span>';
+                    el.innerHTML = '🔴 <span style="color:red">Offline</span>';
                 }
             })
             .catch(() => {
-                el.innerHTML = '<span style="color:red">● Error</span>';
+                el.innerHTML = '⚠️ <span style="color:red">Error</span>';
             });
     }
 }
 
-
 function checkConnectionStatus(alias) {
     const el = document.getElementById(`status-connect-${alias}`);
     if (el) {
-        el.innerHTML = '⏳ Checking...';
+        el.innerHTML = '🔄 Checking...';
         fetch(`/api/status/${alias}`)
             .then(res => res.json())
             .then(data => {
                 if (data.connected) {
-                    el.innerHTML = '<span style="color:deepskyblue">✔ Connected</span>';
+                    el.innerHTML = '🔌 <span style="color:deepskyblue">Connected</span>';
                 } else {
-                    el.innerHTML = '<span style="color:gray">✖ Not Connected</span>';
+                    el.innerHTML = '❌ <span style="color:gray">Not Connected</span>';
                 }
             })
             .catch(() => {
-                el.innerHTML = '<span style="color:red">● Error</span>';
+                el.innerHTML = '⚠️ <span style="color:red">Error</span>';
             });
     }
 }
@@ -67,11 +66,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     const statusSpan = document.createElement("span");
                     statusSpan.id = `status-${alias}`;
-                    statusSpan.innerHTML = '⏳ Checking...';
+                    // statusSpan.innerHTML = '⏳ Checking...';
                     card.appendChild(statusSpan);
 
                     card.innerHTML += `
                         <strong>${alias}</strong> → ${info.host}:${info.port} (${info.username})
+                        <div class="d-flex justify-content-between mt-1 mb-2">
+                            <div id="status-health-${alias}">🔄 Checking...</div>
+                            <div id="status-connect-${alias}">🔄 Checking...</div>
+                        </div>
                         <div class="mt-2 d-grid gap-2">
                             <button class="btn btn-sm btn-primary me-2 w-100" onclick="connect('${alias}')">Connect</button>
                             <button class="btn btn-sm btn-warning me-2 w-100" onclick="attach('${alias}')">Attach</button>
@@ -94,16 +97,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     // Then periodically every 30 seconds
                     setInterval(() => checkHealth(alias), 30000);
 
-                    fetch(`/api/health/${alias}`)
-                        .then(res => res.json())
-                        .then(statusData => {
-                            const el = document.getElementById(`status-${alias}`);
-                            if (el) {
-                                el.innerHTML = statusData.status === "online"
-                                    ? '<span style="color:lime">● Online</span> '
-                                    : '<span style="color:red">● Offline</span> ';
-                            }
-                        });
                 });
             });
     }
@@ -247,8 +240,8 @@ function downloadLog(alias) {
 function toggleConnection(alias, button) {
     button.disabled = true;
     button.textContent = "Processing...";
+
     fetch(`/api/status/${alias}`)
-        .then(res => res.json())
         .then(res => res.json())
         .then(data => {
             if (data.connected) {
@@ -258,6 +251,7 @@ function toggleConnection(alias, button) {
                         button.classList.add("btn-primary");
                         button.textContent = "Connect";
                         button.disabled = false;
+                        checkConnectionStatus(alias);
                     });
             } else {
                 fetch(`/api/connect/${alias}`, { method: 'POST' })
@@ -267,12 +261,11 @@ function toggleConnection(alias, button) {
                             button.classList.remove("btn-primary");
                             button.classList.add("btn-danger");
                             button.textContent = "Disconnect";
-                            button.disabled = false;
                         } else {
                             alert("Failed to connect: " + (resp.message || "Unknown error"));
-                            button.disabled = false;
-                            button.textContent = "Connect";
                         }
+                        button.disabled = false;
+                        checkConnectionStatus(alias);
                     });
             }
         });
