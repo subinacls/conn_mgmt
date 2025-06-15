@@ -156,6 +156,11 @@ def start_session(data):
                 if r:
                     data = channel.recv(1024).decode("utf-8", errors="ignore")
                     socketio.emit("shell_output", data, to=sid)
+                    # log to session_logs
+                    if alias not in session_logs:
+                        session_logs[alias] = []
+                    session_logs[alias].append(data)
+
         except Exception as e:
             socketio.emit("shell_output", f"[ERROR: recv_loop] {e}\n", to=sid)
 
@@ -255,6 +260,12 @@ def sftp_upload():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/sessions/logs/<alias>", methods=["GET"])
+def get_session_log(alias):
+    if alias in session_logs:
+        log_text = "".join(session_logs[alias])
+        return app.response_class(log_text, mimetype="text/plain")
+    return jsonify({"error": "No logs found"}), 404
 
 
 if __name__ == "__main__":

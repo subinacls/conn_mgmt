@@ -21,6 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="mt-2">
                             <button class="btn btn-sm btn-primary me-2" onclick="connect('${alias}')">Connect</button>
                             <button class="btn btn-sm btn-warning me-2" onclick="attach('${alias}')">Attach</button>
+                            <button class="btn btn-sm btn-info" onclick="downloadLog('${alias}')">Download Log</button>
                             <button class="btn btn-sm btn-danger me-2" onclick="disconnect('${alias}')">Disconnect</button>
                             <button class="btn btn-sm btn-danger" onclick="deleteProfile('${alias}')">Delete</button>
                         </div>
@@ -110,6 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
         openTerminal(alias);
     };
 
+
     window.deleteProfile = function (alias) {
         if (confirm(`Are you sure you want to delete the profile '${alias}'? This action cannot be undone.`)) {
             fetch(`/api/profiles/${alias}`, { method: "DELETE" })
@@ -123,6 +125,10 @@ document.addEventListener("DOMContentLoaded", () => {
     refreshProfiles();
     refreshSessions();
 });
+
+function downloadLog(alias) {
+    window.open(`/api/sessions/logs/${alias}`, "_blank");
+}
 
 function toggleConnection(alias, button) {
     fetch(`/api/status/${alias}`)
