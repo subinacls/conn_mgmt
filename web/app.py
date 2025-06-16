@@ -184,6 +184,35 @@ def get_profiles():
     return jsonify(profiles)
 '''
 
+@socketio.on("attach")
+def handle_attach(data):
+    alias = data.get("alias")
+    sid = request.sid
+
+    if alias in background_sessions:
+        channel = background_sessions[alias]
+        active_channels[sid] = channel
+
+        # Replay session log
+        for line in session_logs.get(alias, []):
+            socketio.emit("output", line, room=sid)
+
+        def forward_output():
+            try:
+                while True:
+                    if channel.recv_ready():
+                        output = channel.recv(1024).decode(errors="ignore")
+                        socketio.emit("output", output, room=sid)
+                        session_logs[alias].append(output)
+                    socketio.sleep(0.1)
+            except Exception as e:
+                socketio.emit("output", f"\n[!] Reattach failed: {e}\n", room=sid)
+
+        socketio.start_background_task(target=forward_output)
+    else:
+        emit("output", f"\n[!] No background session found for alias: {alias}\n")
+
+
 @app.route("/api/profiles", methods=["GET"])
 def get_profiles():
     profiles = load_profiles()

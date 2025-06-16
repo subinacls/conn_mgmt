@@ -23,8 +23,10 @@ function checkHealthStatus(alias) {
     }
 }
 
+
 function checkConnectionStatus(alias) {
     const el = document.getElementById(`status-connect-${alias}`);
+    const lastSeenEl = document.getElementById(`last-seen-${alias}`);
     if (el) {
         el.innerHTML = '🔄 Checking...';
         fetch(`/api/status/${alias}`)
@@ -32,12 +34,15 @@ function checkConnectionStatus(alias) {
             .then(data => {
                 if (data.connected) {
                     el.innerHTML = '🔌 <span style="color:deepskyblue">Connected</span>';
+                    if (lastSeenEl) lastSeenEl.style.display = "none";
                 } else {
                     el.innerHTML = '❌ <span style="color:gray">Not Connected</span>';
+                    if (lastSeenEl) lastSeenEl.style.display = "inline";
                 }
             })
             .catch(() => {
                 el.innerHTML = '⚠️ <span style="color:red">Error</span>';
+                if (lastSeenEl) lastSeenEl.style.display = "inline";
             });
     }
 }
@@ -61,8 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     col.className = "col-12 col-sm-6 col-md-4 col-lg-3 d-flex align-items-stretch";
 
                     const jumpInfo = info.jumpHost    ? `<br><span class="text-warning">🛰️ Jump via: <code>${info.jumpHost}</code></span>`    : "";
-                    const lastSeen = info.last_seen   ? `<br><small class="text-muted">Last Seen: ${info.last_seen}</small>`    : "";
-
+                    const lastSeen = info.last_seen  ? `<br><small class="text-muted" id="last-seen-${alias}" style="display:none">Last Seen: ${info.last_seen}</small>`  : "";
                     const card = document.createElement("div");
                     card.className = "card bg-secondary text-white h-100 p-3";
                     card.style.minHeight = "200px";  // or adjust to 250px, etc.
@@ -83,6 +87,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="mt-2 d-grid gap-2">
                             <button class="btn btn-sm btn-primary me-2 w-100" onclick="connect('${alias}')">Connect</button>
                             <button class="btn btn-sm btn-dark w-100" onclick="showDetails('${alias}')">Details 🔍</button>
+                            <button class="btn btn-sm btn-danger" onclick="closeTerminal()">❌ Close</button>
                             <button class="btn btn-sm btn-warning me-2 w-100" onclick="attach('${alias}')">Attach</button>
                             <button class="btn btn-sm btn-outline-light me-2 w-100" onclick="editProfile('${alias}')">Edit</button>
                             <button class="btn btn-sm btn-info w-100" onclick="downloadLog('${alias}')">Get Log</button>
@@ -130,6 +135,32 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
+    function attach(alias) {
+        // Destroy and re-create terminal
+        if (term) term.dispose();
+        term = new Terminal({ cursorBlink: true, theme: { background: "#000000" } });
+        term.open(document.getElementById("terminal"));
+        term.focus();
+
+        // Show modal
+        document.getElementById("terminalModal").style.display = "block";
+
+        // WebSocket bind
+        if (!socket) {
+            socket = io();
+        }
+
+        // Bind output and input events
+        socket.off("output");
+        socket.on("output", data => term.write(data));
+
+        term.onData(data => {
+            socket.emit("command", { data });
+        });
+
+        // Emit attach request
+        socket.emit("attach", { alias });
+    }
 
 
 
@@ -564,4 +595,9 @@ function executeBase64Script(alias, rawScript) {
         console.error("Error executing script:", err);
         alert("❌ Failed to execute script.");
     });
+}
+
+function closeTerminal() {
+    if (term) term.dispose();
+    document.getElementById("terminalModal").style.display = "none";
 }
