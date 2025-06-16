@@ -136,6 +136,18 @@ def delete_profile(alias):
 
 @app.route("/api/connect/<alias>", methods=["POST"])
 def connect_profile(alias):
+    """
+    API endpoint to establish an SSH connection.
+
+    Args:
+        alias (str): Profile alias passed in the URL.
+
+    Request JSON:
+        { "host": str, "port": int, "username": str, "password": str, "key_file": str }
+
+    Returns:
+        JSON response indicating connection status.
+    """
     profiles = load_profiles()
     profile = profiles.get(alias)
     if not profile:
@@ -159,6 +171,15 @@ def connect_profile(alias):
 
 @app.route("/api/disconnect/<alias>", methods=["POST"])
 def disconnect_profile(alias):
+    """
+    API endpoint to disconnect an existing SSH session.
+
+    Args:
+        alias (str): Session alias to disconnect.
+
+    Returns:
+        JSON response indicating disconnection status.
+    """
     try:
         background_sessions.pop(alias, None)
         ssh_mgr.close(alias)

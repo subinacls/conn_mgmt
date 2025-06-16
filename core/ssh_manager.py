@@ -9,13 +9,25 @@ SESSION_DIR = "/tmp/ssh_sessions"
 os.makedirs(SESSION_DIR, exist_ok=True)
 
 class SSHManager:
+    """
+    Initializes the SSHManager with dictionaries to manage SSH sessions and shell channels.
+    """
     def __init__(self):
         self.sessions = {}  # key: alias, value: paramiko.SSHClient
         self.shells = {}  # key: alias, value: invoke_shell() channel
 
     def start_session(self, alias, config):
+        """
+        Starts a new SSH session in a separate xterm window based on the provided configuration.
+
+        Args:
+            alias (str): A unique identifier for the SSH session.
+            config (dict): A dictionary containing SSH connection parameters and options.
+        """
+
         port = config.get("port", 22)
-        username = config["username"]
+        username = config.get("username")
+        host = config.get("host")
 
         # Build base SSH command
         cmd = ["xterm", "-T", f"SSH: {alias}", "-e", "ssh"]
@@ -24,7 +36,8 @@ class SSHManager:
         jump = config.get("jumpHost")
         if jump:
             #cmd += ["-o", f"ProxyCommand=ssh -W %h:%p {jump}"]
-            cmd += ["-J", jump]
+            cmd.append("-J")
+            cmd.append(jump)
 
         key_text = config.get("key_text", "").strip()
         key_file = config.get("key_file")
@@ -34,52 +47,62 @@ class SSHManager:
             with open(temp_key_path, "w") as keyfile:
                 keyfile.write(key_text)
             os.chmod(temp_key_path, 0o600)
-            cmd += ["-i", temp_key_path]
+            cmd.append("-i")
+            cmd.append(temp_key_path)
         elif key_file:
-            cmd += ["-i", key_file]
+            cmd.append("-i")
+            cmd.append(key_file)
 
         # Gateway ports
         if config.get("gatewayPorts"):
             cmd.append("-g")
-
+        print(" ".join(cmd))
         # Compression (-C)
         if config.get("compression"):
             cmd.append("-C")
-
+        print(" ".join(cmd))
         # Agent forwarding (-A)
         if config.get("agentForwarding"):
             cmd.append("-A")
-
+        print(" ".join(cmd))
         # X11 forwarding (-X)
         if config.get("x11Forwarding"):
             cmd.append("-X")
-
+        print(" ".join(cmd))
         # Local forwarding
         lf = config.get("localForward")
         if lf:
-            cmd += ["-L", lf]
-
+            cmd.append("-L")
+            cmd.append(lf)
+        print(" ".join(cmd))
         # Remote forwarding
         rf = config.get("remoteForward")
         if rf:
-            cmd += ["-R", rf]
-
+            cmd.append("-R")
+            cmd.append(rf)
+        print(" ".join(cmd))
         # SOCKS5 proxy
         dp = config.get("socksProxy")
         if dp:
-            cmd += ["-D", dp]
-
+            cmd.append("-D")
+            cmd.append(dp)
+        print(" ".join(cmd))
         # Custom -o options (space-separated list of Option=Value)
         custom_opts = config.get("customOptions", "")
         if custom_opts:
             for opt in custom_opts.strip().split():
-                cmd += ["-o", opt]
-
+                cmd.append("-o")
+                cmd.append(opt)
+        print(" ".join(cmd))
         # Add user@host and port
-        cmd += ["-p", str(port), f"{username}@{host}"]
+        cmd.append("-p")
+        cmd.append(port)
+        cmd.append(f"{username}@{host}")
+        print(" ".join(cmd))
 
         # log the cmd
         logging.info(f"[{alias}] Launching SSH command: {' '.join(cmd)}")
+        print(" ".join(cmd))
 
         # Start the SSH session in a new xterm window
         subprocess.Popen(cmd)
@@ -88,6 +111,12 @@ class SSHManager:
 
 
     def attach_session(self, alias):
+        """
+        Placeholder method for attaching to an existing session.
+
+        Args:
+            alias (str): Alias of the session to attach to.
+        """
         # Placeholder for attach functionality
         print(f"Attach requested for {alias}")
 
@@ -96,6 +125,17 @@ class SSHManager:
 
 
     def connect(self, alias, host, port=22, username=None, password=None, key_file=None):
+        """
+        Establishes an SSH connection and stores the session.
+
+        Args:
+            alias (str): Unique identifier for the session.
+            host (str): Target hostname or IP.
+            port (int): SSH port (default is 22).
+            username (str): SSH username.
+            password (str): Optional password.
+            key_file (str): Optional path to a private key file.
+        """
         if alias in self.sessions:
             raise Exception(f"Alias '{alias}' already in use.")
 
@@ -112,6 +152,13 @@ class SSHManager:
         print(f"[+] Connected to {host} as {username}")
 
     def open_shell(self, alias, elevate=False):
+        """
+        Opens an interactive shell session.
+
+        Args:
+            alias (str): Session alias to open shell on.
+            elevate (bool): If True, elevates to root using sudo.
+        """
         client = self.sessions.get(alias)
         if not client:
             raise Exception("No active session found for alias.")
@@ -150,6 +197,12 @@ class SSHManager:
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, oldtty)
 
     def open_sftp(self, alias):
+        """
+        Starts an SFTP session for file transfers over the existing SSH connection.
+
+        Args:
+            alias (str): Session alias.
+        """
         client = self.sessions.get(alias)
         if not client:
             raise Exception("No active session found for alias.")
@@ -188,6 +241,13 @@ class SSHManager:
         sftp.close()
 
     def background_shell(self, alias, elevate=False):
+        """
+        Opens a background shell session in tmux.
+
+        Args:
+            alias (str): Alias of the session.
+            elevate (bool): If True, starts the shell with sudo -i.
+        """
         client = self.sessions.get(alias)
         if not client:
             raise Exception("No active session found for alias.")
@@ -208,6 +268,12 @@ class SSHManager:
         print(f"[+] Background shell started in tmux session '{local_tmux}'.")
 
     def close(self, alias):
+        """
+        Closes the SSH session and removes it from the internal store.
+
+        Args:
+            alias (str): Alias of the session to close.
+        """
         if alias in self.sessions:
             self.sessions[alias].close()
             del self.sessions[alias]
@@ -216,6 +282,15 @@ class SSHManager:
             print("[-] Alias not found.")
 
     def is_connected(self, alias):
+        """
+        Checks if a session is connected and the transport is active.
+
+        Args:
+            alias (str): Alias of the session to check.
+
+        Returns:
+            bool: True if session is active, False otherwise.
+        """
         client = self.sessions.get(alias)
         if not client:
             return False
@@ -223,11 +298,25 @@ class SSHManager:
         return transport is not None and transport.is_active()
 
     def list_connected_aliases(self):
+        """
+        Lists all currently connected session aliases.
+
+        Returns:
+            list: A list of connected aliases.
+        """
         return [alias for alias, client in self.sessions.items()
                 if client.get_transport() and client.get_transport().is_active()]
 
     def get_sftp(self, alias):
-        """Return an SFTP client tied to the existing SSH session."""
+        """
+        Retrieves or opens a new SFTP session for the given alias.
+
+        Args:
+            alias (str): Session alias.
+
+        Returns:
+            paramiko.SFTPClient: The SFTP client instance.
+        """
         if alias not in self.sessions:
             raise ValueError(f"No active session for alias: {alias}")
         client = self.sessions[alias]
@@ -237,7 +326,14 @@ class SSHManager:
 
     def inject_authorized_key(self, ssh_client, public_key: str):
         """
-        Injects public key without using SFTP and avoids duplicates.
+        Adds a public key to the authorized_keys file on the remote server if it doesn't already exist.
+
+        Args:
+            ssh_client (paramiko.SSHClient): An active SSH client.
+            public_key (str): The public key string to inject.
+
+        Returns:
+            str: 'injected' if added, 'exists' if already present.
         """
         escaped_key = public_key.replace('"', '\\"')
         check_cmd = f'grep -qxF "{escaped_key}" ~/.ssh/authorized_keys'
@@ -255,6 +351,16 @@ class SSHManager:
             return "exists"
 
     def run_command(self, alias, command: str):
+        """
+        Executes a shell command over SSH and returns the output.
+
+        Args:
+            alias (str): Session alias.
+            command (str): Shell command to execute.
+
+        Returns:
+            dict: Contains 'output' and 'error' keys with respective string results.
+        """
         if alias not in self.sessions:
             raise Exception("No active session found for alias.")
         client = self.sessions[alias]
@@ -265,6 +371,16 @@ class SSHManager:
 
 
     def run_b64_script(self, alias, b64_script: str):
+        """
+        Executes a base64-encoded shell script remotely.
+
+        Args:
+            alias (str): Session alias.
+            b64_script (str): Base64-encoded script content.
+
+        Returns:
+            dict: Contains 'output' and 'error' keys with results from script execution.
+        """
         if alias not in self.sessions:
             raise Exception("No active session found for alias.")
         client = self.sessions[alias]
