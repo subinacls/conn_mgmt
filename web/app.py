@@ -12,9 +12,11 @@ import paramiko
 import os
 import json
 import socket
+from datetime import datetime
 
 from core.ssh_manager import SSHManager
 
+HISTORY_FILE = "seen_history.json"
 
 from pydantic import BaseModel
 import base64
@@ -31,6 +33,16 @@ ssh_mgr = SSHManager()
 active_channels = {}      # { sid: channel }
 background_sessions = {}  # { alias: channel }
 session_logs = {}         # { alias: [lines] }
+
+def load_seen_history():
+    if os.path.exists(HISTORY_FILE):
+        with open(HISTORY_FILE) as f:
+            return json.load(f)
+    return {}
+
+def save_seen_history(data):
+    with open(HISTORY_FILE, "w") as f:
+        json.dump(data, f, indent=2)
 
 def load_profiles():
     if os.path.exists(CONFIG_FILE):
@@ -52,9 +64,11 @@ def connection_status(alias):
     is_connected = ssh_mgr.is_connected(alias)
     return jsonify({"connected": is_connected})
 
+'''
 @app.route("/api/profiles", methods=["GET"])
 def get_profiles():
     return jsonify(load_profiles())
+'''
 
 @app.route("/api/profiles", methods=["POST"])
 def add_profile():
@@ -148,6 +162,9 @@ def disconnect_profile(alias):
     try:
         background_sessions.pop(alias, None)
         ssh_mgr.close(alias)
+        seen = load_seen_history()
+        seen[alias] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        save_seen_history(seen)
         return jsonify({"message": f"Disconnected {alias}"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -155,6 +172,26 @@ def disconnect_profile(alias):
 @app.route("/api/sessions", methods=["GET"])
 def get_sessions():
     return jsonify(list(background_sessions.keys()))
+
+'''
+@app.route("/api/profiles")
+def get_profiles():
+    profiles = load_profiles()
+    seen = load_seen_history()
+    # Attach last_seen to each profile
+    for alias in profiles:
+        profiles[alias]["last_seen"] = seen.get(alias)
+    return jsonify(profiles)
+'''
+
+@app.route("/api/profiles", methods=["GET"])
+def get_profiles():
+    profiles = load_profiles()
+    seen = load_seen_history()
+    # Attach last_seen to each profile
+    for alias in profiles:
+        profiles[alias]["last_seen"] = seen.get(alias)
+    return jsonify(profiles)
 
 @socketio.on("start_session")
 def start_session(data):

@@ -61,7 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     col.className = "col-12 col-sm-6 col-md-4 col-lg-3 d-flex align-items-stretch";
 
                     const jumpInfo = info.jumpHost    ? `<br><span class="text-warning">🛰️ Jump via: <code>${info.jumpHost}</code></span>`    : "";
-
+                    const lastSeen = info.last_seen   ? `<br><small class="text-muted">Last Seen: ${info.last_seen}</small>`    : "";
 
                     const card = document.createElement("div");
                     card.className = "card bg-secondary text-white h-100 p-3";
@@ -75,6 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     card.innerHTML += `
                         <strong>${alias}</strong> → ${info.host}:${info.port} (${info.username})
                         ${jumpInfo}
+                        ${lastSeen}
                         <div class="d-flex justify-content-between mt-1 mb-2">
                             <div id="status-health-${alias}">🔄 Checking...</div>
                             <div id="status-connect-${alias}">🔄 Checking...</div>
@@ -413,6 +414,7 @@ function showDetails(alias) {
             const profile = data[alias];
             if (!profile) return alert("Profile not found");
 
+            // Build the ssh command string
             let cmd = `ssh `;
 
             if (profile.key_file) {
@@ -442,12 +444,25 @@ function showDetails(alias) {
                 cmd += ` -p ${profile.port}`;
             }
 
-            document.getElementById("detailsContent").textContent = cmd;
+            // Format additional metadata
+            let extraInfo = "";
+            if (profile.jumpHost) {
+                extraInfo += `<div><strong>Jump Host:</strong> ${profile.jumpHost}</div>`;
+            }
+            if (profile.last_seen) {
+                extraInfo += `<div><strong>Last Seen:</strong> ${profile.last_seen}</div>`;
+            }
+
+            // Inject into modal
+            document.getElementById("detailsContent").innerHTML = `
+                <pre class="mb-2">${cmd}</pre>
+                ${extraInfo}
+            `;
+
             const modal = new bootstrap.Modal(document.getElementById("detailsModal"));
             modal.show();
         });
 }
-
 
 
 function injectKey(alias) {
