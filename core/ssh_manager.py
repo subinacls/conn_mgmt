@@ -3,6 +3,7 @@ import os
 import subprocess
 import uuid
 import base64
+import logging
 
 SESSION_DIR = "/tmp/ssh_sessions"
 os.makedirs(SESSION_DIR, exist_ok=True)
@@ -76,6 +77,9 @@ class SSHManager:
 
         # Add user@host and port
         cmd += ["-p", str(port), f"{username}@{host}"]
+
+        # log the cmd
+        logging.info(f"[{alias}] Launching SSH command: {' '.join(cmd)}")
 
         # Start the SSH session in a new xterm window
         subprocess.Popen(cmd)
