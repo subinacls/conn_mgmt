@@ -28,11 +28,12 @@ class BashScriptPayload(BaseModel):
 
 app = Flask(__name__)
 CONFIG_FILE = os.path.expanduser("~/.ssh_connections.json")
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 ssh_mgr = SSHManager()
 active_channels = {}      # { sid: channel }
 background_sessions = {}  # { alias: channel }
 session_logs = {}         # { alias: [lines] }
+reader_threads = {}  # alias → Thread
 
 def load_seen_history():
     if os.path.exists(HISTORY_FILE):
@@ -270,26 +271,28 @@ def start_session(data):
             background_sessions[alias] = channel
 
         active_channels[sid] = channel
+
+        def read_output():
+            try:
+                while alias in background_sessions and sid in active_channels:
+                    r, _, _ = select.select([channel], [], [], 0.1)
+                    if r:
+                        data = channel.recv(4096).decode(errors="ignore")
+                        socketio.emit("shell_output", data, to=sid)
+            except Exception as e:
+                socketio.emit("shell_output", f"[ERROR] Read failure: {e}\n", to=sid)
+
+        if alias not in reader_threads or not reader_threads[alias].is_alive():
+            thread = threading.Thread(target=read_output, daemon=True)
+            thread.start()
+            reader_threads[alias] = thread
+
+        emit("shell_output", "[+] Session attached\n")
+
     except Exception as e:
         emit("shell_output", f"[ERROR] {str(e)}\n")
         return
 
-    def read_output():
-        try:
-            while sid in active_channels:
-                r, _, _ = select.select([channel], [], [], 0.1)
-                if r:
-                    data = channel.recv(1024).decode("utf-8", errors="ignore")
-                    socketio.emit("shell_output", data, to=sid)
-                    # log to session_logs
-                    if alias not in session_logs:
-                        session_logs[alias] = []
-                    session_logs[alias].append(data)
-
-        except Exception as e:
-            socketio.emit("shell_output", f"[ERROR: recv_loop] {e}\n", to=sid)
-
-    threading.Thread(target=read_output, daemon=True).start()
 
 @socketio.on("shell_input")
 def on_shell_input(data):

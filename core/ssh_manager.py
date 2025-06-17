@@ -159,6 +159,9 @@ class SSHManager:
             alias (str): Session alias to open shell on.
             elevate (bool): If True, elevates to root using sudo.
         """
+        if alias in self.shells:
+            raise Exception(f"{alias} already has an interactive shell open. Cannot launch another.")
+
         client = self.sessions.get(alias)
         if not client:
             raise Exception("No active session found for alias.")
@@ -350,6 +353,7 @@ class SSHManager:
         else:
             return "exists"
 
+    '''
     def run_command(self, alias, command: str):
         """
         Executes a shell command over SSH and returns the output.
@@ -368,8 +372,41 @@ class SSHManager:
         output = stdout.read().decode().strip()
         error = stderr.read().decode().strip()
         return {"output": output, "error": error}
+    '''
 
+    def run_command(self, alias, command: str):
+        """
+        Executes a shell command over SSH and returns the output.
+        Uses a separate SSHClient instance to avoid conflict with invoke_shell.
+        """
+        if alias not in self.sessions:
+            raise Exception("No active session found for alias.")
 
+        base_client = self.sessions[alias]
+        peer_host, port = base_client.get_transport().getpeername()[0], base_client.get_transport().getpeername()[1]
+        username = base_client.get_transport().get_username()
+
+        temp_alias = f"{alias}__exec"
+        temp_client = paramiko.SSHClient()
+        temp_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        try:
+            # Reuse auth method from original client
+            if hasattr(base_client._transport, '_preferred_auth') and 'publickey' in base_client._transport._preferred_auth:
+                # Key-based reuse not possible directly, assume agent or key_file
+                temp_client.connect(hostname=peer_host, port=port, username=username)
+            else:
+                raise Exception("run_command: Auth method not reusable. Use separate credentials.")
+
+            stdin, stdout, stderr = temp_client.exec_command(command)
+            output = stdout.read().decode().strip()
+            error = stderr.read().decode().strip()
+        finally:
+            temp_client.close()
+
+        return {"output": output, "error": error}
+
+    '''
     def run_b64_script(self, alias, b64_script: str):
         """
         Executes a base64-encoded shell script remotely.
@@ -394,4 +431,31 @@ class SSHManager:
         output = stdout.read().decode().strip()
         error = stderr.read().decode().strip()
         return {"output": output, "error": error}
+    '''
 
+    def run_b64_script(self, alias, b64_script: str):
+        """
+        Executes a base64-encoded shell script remotely.
+        Uses a separate SSHClient instance to avoid conflict with invoke_shell.
+        """
+        if alias not in self.sessions:
+            raise Exception("No active session found for alias.")
+
+        base_client = self.sessions[alias]
+        peer_host, port = base_client.get_transport().getpeername()[0], base_client.get_transport().getpeername()[1]
+        username = base_client.get_transport().get_username()
+
+        temp_client = paramiko.SSHClient()
+        temp_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        try:
+            temp_client.connect(hostname=peer_host, port=port, username=username)
+            filename = f"/tmp/{uuid.uuid4().hex}.sh"
+            commands = f"echo {b64_script} | base64 -d > {filename} && chmod +x {filename} && bash {filename}; rm -f {filename}"
+            stdin, stdout, stderr = temp_client.exec_command(commands)
+            output = stdout.read().decode().strip()
+            error = stderr.read().decode().strip()
+        finally:
+            temp_client.close()
+
+        return {"output": output, "error": error}

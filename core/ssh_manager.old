@@ -1,0 +1,300 @@
+import paramiko
+import os
+import subprocess
+import uuid
+import base64
+import logging
+import stat
+import threading
+import time
+import termios
+import tty
+import sys
+import select
+
+SESSION_DIR = "/tmp/ssh_sessions"
+os.makedirs(SESSION_DIR, exist_ok=True)
+os.chmod(SESSION_DIR, 0o700)
+
+logger = logging.getLogger("SSHManager")
+logger.setLevel(logging.DEBUG)
+
+class SSHManager:
+    def __init__(self):
+        self.sessions = {}
+        self.shells = {}
+        self.lock = threading.Lock()
+
+    def start_session(self, alias, config):
+        try:
+            port = str(config.get("port", 22))
+            username = config["username"]
+            host = config["host"]
+
+            cmd = ["xterm", "-T", f"SSH: {alias}", "-e", "ssh"]
+
+            jump = config.get("jumpHost")
+            if jump:
+                cmd += ["-J", jump]
+
+            key_file = config.get("key_file")
+            key_text = config.get("key_text", "").strip()
+
+            if key_text:
+                temp_key_path = os.path.join(SESSION_DIR, f"{alias}_id.key")
+                with open(temp_key_path, "w") as f:
+                    f.write(key_text)
+                os.chmod(temp_key_path, 0o600)
+                key_file = temp_key_path
+
+            if key_file:
+                cmd += ["-i", key_file]
+
+            if config.get("gatewayPorts"):
+                cmd.append("-g")
+
+            if config.get("compression"):
+                cmd.append("-C")
+
+            if config.get("agentForwarding"):
+                cmd.append("-A")
+
+            if config.get("x11Forwarding"):
+                cmd.append("-X")
+
+            lf = config.get("localForward")
+            if lf:
+                cmd += ["-L", lf]
+
+            rf = config.get("remoteForward")
+            if rf:
+                cmd += ["-R", rf]
+
+            dp = config.get("socksProxy")
+            if dp:
+                cmd += ["-D", dp]
+
+            custom_opts = config.get("customOptions", "")
+            if custom_opts:
+                for opt in custom_opts.strip().split():
+                    cmd += ["-o", opt]
+
+            cmd += ["-p", port, f"{username}@{host}"]
+
+            logger.info(f"[{alias}] Launching SSH command: {' '.join(cmd)}")
+            subprocess.Popen(cmd)
+
+        except Exception as e:
+            logger.exception(f"[ERROR] Failed to start xterm session: {e}")
+
+    def connect(self, alias, host, port=22, username=None, password=None, key_file=None):
+        try:
+            if alias in self.sessions:
+                raise Exception(f"Alias '{alias}' already in use.")
+
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+            if key_file:
+                pkey = paramiko.RSAKey.from_private_key_file(key_file)
+                client.connect(hostname=host, port=port, username=username, pkey=pkey)
+            elif password:
+                client.connect(hostname=host, port=port, username=username, password=password)
+            else:
+                raise Exception("Missing authentication method")
+
+            with self.lock:
+                self.sessions[alias] = client
+
+            logger.info(f"[+] Connected to {host} as {username}")
+            return client
+        except Exception as e:
+            logger.exception(f"[ERROR] SSH connect failed: {e}")
+            raise
+
+    def invoke_shell(self, alias):
+        client = self.sessions.get(alias)
+        if not client:
+            raise Exception("No active session found for alias.")
+
+        channel = client.invoke_shell()
+        with self.lock:
+            self.shells[alias] = channel
+
+        return channel
+
+    def close_session(self, alias):
+        with self.lock:
+            if alias in self.shells:
+                try:
+                    self.shells[alias].close()
+                except Exception:
+                    pass
+                del self.shells[alias]
+
+            if alias in self.sessions:
+                try:
+                    self.sessions[alias].close()
+                except Exception:
+                    pass
+                del self.sessions[alias]
+
+        key_path = os.path.join(SESSION_DIR, f"{alias}_id.key")
+        if os.path.exists(key_path):
+            try:
+                os.remove(key_path)
+            except Exception:
+                pass
+
+        logger.info(f"[+] Cleaned up SSH session {alias}")
+
+    def is_alive(self, alias):
+        client = self.sessions.get(alias)
+        if client:
+            try:
+                transport = client.get_transport()
+                return transport and transport.is_active()
+            except Exception:
+                return False
+        return False
+
+    def open_shell(self, alias, elevate=False):
+        client = self.sessions.get(alias)
+        if not client:
+            raise Exception("No active session found for alias.")
+
+        channel = client.invoke_shell()
+        with self.lock:
+            self.shells[alias] = channel
+
+        if elevate:
+            channel.send("sudo -i\n")
+
+        oldtty = termios.tcgetattr(sys.stdin)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            channel.settimeout(0.0)
+            while True:
+                r, w, e = select.select([channel, sys.stdin], [], [])
+                if sys.stdin in r:
+                    data = sys.stdin.read(1)
+                    if not data:
+                        break
+                    channel.send(data)
+                if channel in r:
+                    try:
+                        x = channel.recv(1024)
+                        if not x:
+                            break
+                        sys.stdout.write(x.decode())
+                        sys.stdout.flush()
+                    except Exception:
+                        pass
+        finally:
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, oldtty)
+
+    def open_sftp(self, alias):
+        client = self.sessions.get(alias)
+        if not client:
+            raise Exception("No active session found for alias.")
+
+        sftp = client.open_sftp()
+        print("[+] SFTP session opened. Type 'exit' to quit.")
+
+        while True:
+            try:
+                cmd = input("sftp> ").strip()
+                if cmd == "exit":
+                    break
+                elif cmd.startswith("get "):
+                    _, remote_path = cmd.split(maxsplit=1)
+                    filename = os.path.basename(remote_path)
+                    sftp.get(remote_path, filename)
+                    print(f"[+] Downloaded {filename}")
+                elif cmd.startswith("put "):
+                    _, local_path = cmd.split(maxsplit=1)
+                    filename = os.path.basename(local_path)
+                    sftp.put(local_path, filename)
+                    print(f"[+] Uploaded {filename}")
+                elif cmd == "ls":
+                    for f in sftp.listdir():
+                        print(f)
+                elif cmd.startswith("cd "):
+                    _, path = cmd.split(maxsplit=1)
+                    sftp.chdir(path)
+                elif cmd == "pwd":
+                    print(sftp.getcwd())
+                else:
+                    print("[-] Unknown SFTP command.")
+            except Exception as e:
+                print(f"[-] Error: {e}")
+
+        sftp.close()
+
+    def background_shell(self, alias, elevate=False):
+        client = self.sessions.get(alias)
+        if not client:
+            raise Exception("No active session found for alias.")
+
+        session = client.get_transport().open_session()
+        session.get_pty()
+        if elevate:
+            session.exec_command("sudo -i")
+        else:
+            session.exec_command("/bin/bash")
+
+        local_tmux = f"{alias}_bg"
+        subprocess.run([
+            "tmux", "new-session", "-d", "-s", local_tmux,
+            f"ssh {client.get_transport().get_username()}@{client.get_transport().getpeername()[0]}"
+        ])
+        print(f"[+] Background shell started in tmux session '{local_tmux}'.")
+
+    def list_connected_aliases(self):
+        return [alias for alias, client in self.sessions.items()
+                if client.get_transport() and client.get_transport().is_active()]
+
+    def get_sftp(self, alias):
+        if alias not in self.sessions:
+            raise ValueError(f"No active session for alias: {alias}")
+        client = self.sessions[alias]
+        if not hasattr(client, "_sftp_client") or client._sftp_client is None:
+            client._sftp_client = client.open_sftp()
+        return client._sftp_client
+
+    def inject_authorized_key(self, ssh_client, public_key):
+        escaped_key = public_key.replace('"', '\\"')
+        check_cmd = f'grep -qxF "{escaped_key}" ~/.ssh/authorized_keys'
+        append_cmd = (
+            f'mkdir -p ~/.ssh && chmod 700 ~/.ssh && '
+            f'echo "{escaped_key}" >> ~/.ssh/authorized_keys && '
+            f'chmod 600 ~/.ssh/authorized_keys'
+        )
+
+        stdin, stdout, stderr = ssh_client.exec_command(check_cmd)
+        if stdout.channel.recv_exit_status() != 0:
+            ssh_client.exec_command(append_cmd)
+            return "injected"
+        else:
+            return "exists"
+
+    def run_command(self, alias, command):
+        if alias not in self.sessions:
+            raise Exception("No active session found for alias.")
+        client = self.sessions[alias]
+        stdin, stdout, stderr = client.exec_command(command)
+        output = stdout.read().decode().strip()
+        error = stderr.read().decode().strip()
+        return {"output": output, "error": error}
+
+    def run_b64_script(self, alias, b64_script):
+        if alias not in self.sessions:
+            raise Exception("No active session found for alias.")
+        client = self.sessions[alias]
+        filename = f"/tmp/{uuid.uuid4().hex}.sh"
+        commands = f"echo {b64_script} | base64 -d > {filename} && chmod +x {filename} && bash {filename}; rm -f {filename}"
+        stdin, stdout, stderr = client.exec_command(commands)
+        output = stdout.read().decode().strip()
+        error = stderr.read().decode().strip()
+        return {"output": output, "error": error}
+
