@@ -34,6 +34,7 @@ active_channels = {}      # { sid: channel }
 background_sessions = {}  # { alias: channel }
 session_logs = {}         # { alias: [lines] }
 reader_threads = {}  # alias → Thread
+profiles = {}
 
 def load_seen_history():
     if os.path.exists(HISTORY_FILE):
@@ -70,6 +71,59 @@ def connection_status(alias):
 def get_profiles():
     return jsonify(load_profiles())
 '''
+
+@app.route("/api/profiles/<alias>/introspect", methods=["GET"])
+def introspect_remote_host(alias):
+    try:
+        client = ssh_mgr.sessions.get(alias)
+        if not client:
+            return jsonify({"error": "Not connected"}), 400
+
+        profile = {}
+
+        def run(cmd):
+            stdin, stdout, stderr = client.exec_command(cmd)
+            return stdout.read().decode().strip(), stderr.read().decode().strip()
+
+        # Get current user
+        profile["user"], _ = run("whoami")
+
+        # Get hostname
+        profile["hostname"], _ = run("uname -n")
+
+        # Get kernel version
+        profile["kernel"], _ = run("uname -r")
+
+        # Get ID output (e.g. uid/gid info)
+        profile["id"], _ = run("id")
+
+
+        # Check if sudo is installed
+        sudo_check, sudo_err = run("which sudo")
+        profile["sudo_available"] = bool(sudo_check)
+
+        if not sudo_check:
+            profile["has_sudo"] = False
+            profile["sudo_details"] = "sudo not installed"
+        else:
+            # Now use sudo -l -n to check for permission
+            sudo_output, sudo_error = run("sudo -l -n 2>&1")
+            if "may run the following" in sudo_output:
+                profile["has_sudo"] = True
+                profile["sudo_details"] = sudo_output
+            elif "a password is required" in sudo_error:
+                profile["has_sudo"] = True
+                profile["sudo_details"] = "sudo available but requires password"
+            else:
+                profile["has_sudo"] = False
+                profile["sudo_details"] = sudo_output or sudo_error
+
+        profile["sudo_debug"] = sudo_err if sudo_err else sudo_check
+
+        return jsonify(profile)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/api/profiles", methods=["POST"])
 def add_profile():

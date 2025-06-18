@@ -4,6 +4,30 @@ let term;
 let editMode = false;
 let editingAlias = null;
 
+document.addEventListener("DOMContentLoaded", () => {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.forEach(el => new bootstrap.Tooltip(el));
+});
+
+function showIntrospection(alias) {
+    fetch(`/api/profiles/${alias}/introspect`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) return alert("❌ " + data.error);
+
+            const summary = `
+Alias: ${data.alias}
+------------------------
+${data.output}
+
+Sudo access: ${data.has_sudo ? '✅ YES' : '❌ NO'}
+            `.trim();
+
+            alert(summary);
+        });
+}
+
+
 function checkHealthStatus(alias) {
     const el = document.getElementById(`status-health-${alias}`);
     if (el) {
@@ -26,7 +50,6 @@ function checkHealthStatus(alias) {
 function checkConnectionStatus(alias) {
     const el = document.getElementById(`status-connect-${alias}`);
     const togglebutton = document.getElementById(`toggle-btn-${alias}`);
-    const attachBtn = document.getElementById(`attach-btn-${alias}`);
 
     fetch(`/api/status/${alias}`)
         .then(res => res.json())
@@ -36,7 +59,7 @@ function checkConnectionStatus(alias) {
                     el.innerHTML = '🔌 <span style="color:deepskyblue">Connected</span>';
                     const isConnected = true;
                 } else {
-                    el.innerHTML = '❌ <span style="color:gray">Not Connected</span>';
+                    el.innerHTML = '❌ <span style="color:yellow">Not Connected</span>';
                     const isConnected = false;
                 }
             }
@@ -52,17 +75,45 @@ function checkConnectionStatus(alias) {
                     togglebutton.classList.remove("btn-primary");
                     togglebutton.classList.add("btn-danger");
                     togglebutton.textContent = "Disconnect";
-                    attachBtn.style.display = "inline-block";
                 } else {
                     togglebutton.classList.remove("btn-danger");
                     togglebutton.classList.add("btn-primary");
                     togglebutton.textContent = "Connect";
-                    attachBtn.style.display = "none";
                 }
 
             }
         });
 }
+
+
+function checkRemoteProfile(alias) {
+    fetch(`/api/profiles/${alias}/introspect`)
+
+        .then(res => res.json())
+        .then(data => {
+            const el = document.getElementById(`status-profile-${alias}`);
+            if (!el) return;
+
+            if (data.error) {
+                el.innerHTML = `⚠️ <span style="color:orange">${data.error}</span>`;
+            } else {
+                el.innerHTML = `
+                    🧠 <span style="color:#00e1ff">${data.user}</span> • 
+                    ${data.hostname} • 
+                    ${data.os} ${data.arch} 
+                    ${data.is_root ? '<span style="color:lime">✔ sudo</span>' : '<span style="color:gray">✖ no sudo</span>'}
+                `;
+            }
+        })
+        .catch(err => {
+            const el = document.getElementById(`status-profile-${alias}`);
+            if (el) {
+                el.innerHTML = `⚠️ <span style="color:red">Profile error</span>`;
+            }
+        });
+}
+
+
 
 document.addEventListener("DOMContentLoaded", () => {
     const profileList = document.getElementById("profileList");
@@ -82,6 +133,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         .then(status => {
                             const isConnected = status.connected === true;
 
+                            if (isConnected) {
+                                checkRemoteProfile(alias)
+                            }
                             const col = document.createElement("div");
                             col.className = "col-12 col-sm-6 col-md-4 col-lg-3 d-flex align-items-stretch";
 
@@ -103,44 +157,93 @@ document.addEventListener("DOMContentLoaded", () => {
                                 <strong>${alias}</strong> → ${info.host}:${info.port} (${info.username})
                                 ${jumpInfo}
                                 ${lastSeen}
+                                <hr>
                                 <div class="d-flex justify-content-between mt-1 mb-2">
 
                                     <div id="status-health-${alias}">🔄 Checking...</div>
                                     <div id="status-connect-${alias}">🔄 Checking...</div>
-
                                 </div>
+
+                                <div id="status-profile-${alias}" class="text-info small">🔄 Checking...</div>
+                                <button></button>
 
                                 <div class="mt-2 d-grid gap-2">
-                                    <button></button>
+
+                                    <!-- Connect / Disconnect -->
                                     <button id="toggle-btn-${alias}" class="btn btn-sm ${isConnected ? 'btn-danger' : 'btn-primary'}"
-                                        onclick="toggleConnection('${alias}', this)">
+                                        onclick="toggleConnection('${alias}', this)"
+                                        data-bs-toggle="tooltip"
+                                        title="${isConnected ? 'Disconnect from this host' : 'Establish an SSH connection'}">
                                         ${isConnected ? 'Disconnect' : 'Connect'}
                                     </button>
-                                    <button class="btn btn-sm btn-light w-100" onclick="showDetails('${alias}')">Details 🔍</button>
-                                    <button class="btn btn-sm btn-outline-light me-2 w-100" onclick="editProfile('${alias}')">Edit</button>
 
-                                    <hr>
+                                    <!-- Show SSH Details -->
+                                    <button class="btn btn-sm btn-light w-100"
+                                        onclick="showDetails('${alias}')"
+                                        data-bs-toggle="tooltip"
+                                        title="View the SSH command and connection details">
+                                        🔍 Details
+                                    </button>
 
+                                    <!-- Edit Profile -->
+                                    <button class="btn btn-sm btn-outline-light me-2 w-100"
+                                        onclick="editProfile('${alias}')"
+                                        data-bs-toggle="tooltip"
+                                        title="Edit this SSH profile">
+                                        ✏️ Edit
+                                    </button>
+
+                                    <button></button>
+
+                                    <!-- Attach (Terminal) -->
                                     <button id="attach-btn-${alias}" class="btn btn-sm btn-warning me-2 w-100"
                                         style="${isConnected ? 'display:inline-block;' : 'display:none;'}"
-                                        onclick="attach('${alias}')">🖥️ XTerm <b/utton>
+                                        onclick="attach('${alias}')"
+                                        data-bs-toggle="tooltip"
+                                        title="Open a remote terminal session in XTerm">
+                                        🖥️ XTerm
+                                    </button>
 
+                                    <!-- Download Log -->
                                     <button id="log-btn-${alias}" class="btn btn-sm btn-info w-100"
                                         style="${isConnected ? 'display:inline-block;' : 'display:none;'}"
-                                        onclick="downloadLog('${alias}')">📄 Term Logs</button>
+                                        onclick="downloadLog('${alias}')"
+                                        data-bs-toggle="tooltip"
+                                        title="Download the recorded terminal session logs">
+                                        📄 Term Logs
+                                    </button>
 
+                                    <!-- Inject Public Key -->
                                     <button id="injectkey-btn-${alias}" class="btn btn-sm mt-1 w-100"
                                         style="${isConnected ? 'background-color: #28a745; color: #fff; font-weight: bold;' : 'display:none;'}"
-                                        onclick="injectKey('${alias}')">🔑 Inject Keys</button>
+                                        onclick="injectKey('${alias}')"
+                                        data-bs-toggle="tooltip"
+                                        title="Copy your local public SSH key into the remote authorized_keys">
+                                        🔑 Inject Keys
+                                    </button>
 
+                                    <button></button>
+
+                                    <!-- Execute Command -->
                                     <button class="btn btn-sm btn-outline-info mt-1 w-100 fw-bold rounded-2 shadow-sm"
                                         style="${isConnected ? '' : 'display:none;'}"
-                                        onclick="promptAndExecute('${alias}')">⚠️ Run Command</button>
+                                        onclick="promptAndExecute('${alias}')"
+                                        data-bs-toggle="tooltip"
+                                        title="Execute a single bash command on the remote host">
+                                        ⚙️ Run Command
+                                    </button>
 
-                                    <button class="btn btn-sm btn-outline-warning mb-3 collapsed mt-1 w-100 fw-bold rounded-2 shadow-sm"
+                                    <!-- Execute Script -->
+                                    <button class="btn btn-sm btn-outline-warning mb-3 mt-1 w-100 fw-bold rounded-2 shadow-sm"
                                         style="${isConnected ? '' : 'display:none;'}"
-                                        onclick="promptExecuteScript('${alias}')">⚙️ Run Bash Script</button>
+                                        onclick="promptExecuteScript('${alias}')"
+                                        data-bs-toggle="tooltip"
+                                        title="Paste and run a multi-line bash script on this machine">
+                                        📜 Run Bash Script
+                                    </button>
+                                    <hr>
                                 </div>
+
                             `;
 
                             col.appendChild(card);
@@ -148,7 +251,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                             checkHealthStatus(alias);
                             checkConnectionStatus(alias);
-                            setInterval(() => checkHealth(alias), 30000);
+                            setInterval(() => checkHealthStatus(alias), 30000);
                         });
                 });
             });
