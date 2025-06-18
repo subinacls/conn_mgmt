@@ -72,6 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     const jumpInfo = info.jumpHost    ? `<br><span class="text-warning">🛰️ Jump via: <code>${info.jumpHost}</code></span>`    : "";
                     const lastSeen = info.last_seen  ? `<br><small class="text-muted" id="last-seen-${alias}" style="display:none">Last Seen: ${info.last_seen}</small>`  : "";
                     const card = document.createElement("div");
+
                     card.className = "card bg-secondary text-white h-100 p-3";
                     card.style.minHeight = "200px";  // or adjust to 250px, etc.
 
@@ -81,6 +82,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     card.appendChild(statusSpan);
 
                     card.innerHTML += `
+                        <div class="delete-tab" onclick="deleteProfile('${alias}')">
+                          ✖
+                        </div>
                         <strong>${alias}</strong> → ${info.host}:${info.port} (${info.username})
                         ${jumpInfo}
                         ${lastSeen}
@@ -91,11 +95,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="mt-2 d-grid gap-2">
                             <button id="toggle-btn-${alias}" class="btn btn-primary" onclick="toggleConnection('${alias}', this)"> Connect </button> <span id="status-connect-${alias}"></span>
                             <button class="btn btn-sm btn-dark w-100" onclick="showDetails('${alias}')">Details 🔍</button>
-                            <button class="btn btn-sm btn-danger" onclick="closeTerminal()">❌ Close</button>
                             <button class="btn btn-sm btn-warning me-2 w-100" onclick="attach('${alias}')">Attach</button>
                             <button class="btn btn-sm btn-outline-light me-2 w-100" onclick="editProfile('${alias}')">Edit</button>
                             <button class="btn btn-sm btn-info w-100" onclick="downloadLog('${alias}')">Get Log</button>
-                            <button class="btn btn-sm btn-danger w-100" onclick="deleteProfile('${alias}')">Delete</button>
                             <button class="btn btn-sm mt-1 w-100" style="background-color: #28a745; color: #fff; font-weight: bold;" onclick="injectKey('${alias}')">🔑 Inject Public Key</button>
                             <button class="btn btn-sm btn-outline-warning mt-1 w-100" onclick="promptAndExecute('${alias}')">🖥️ Run Command</button>
                             <button class="btn btn-sm btn-outline-warning mt-1 w-100" onclick="promptExecuteScript('${alias}')">⚙️ Run Bash Script</button>
@@ -233,19 +235,24 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
 
-    window.deleteProfile = function (alias) {
-        if (confirm(`Are you sure you want to delete the profile '${alias}'? This action cannot be undone.`)) {
-            fetch(`/api/profiles/${alias}`, { method: "DELETE" })
-                .then(() => {
-                    alert(`Profile '${alias}' deleted.`);
-                    refreshProfiles();
-                });
-        }
-    };
-
     refreshProfiles();
     refreshSessions();
 });
+
+
+function deleteProfile(alias) {
+    if (!confirm(`Are you sure you want to delete profile "${alias}"?`)) return;
+
+    fetch(`/api/profiles/${alias}`, { method: 'DELETE' })
+        .then(res => {
+            if (!res.ok) throw new Error("Failed to delete");
+            // Remove from DOM or refresh UI
+            const el = document.getElementById(`card-${alias}`);
+            if (el) el.remove();
+        })
+        .catch(err => alert("❌ Could not delete profile."));
+}
+
 
 function editProfile(alias) {
     fetch("/api/profiles")
