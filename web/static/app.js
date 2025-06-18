@@ -25,7 +25,8 @@ function checkHealthStatus(alias) {
 
 function checkConnectionStatus(alias) {
     const el = document.getElementById(`status-connect-${alias}`);
-    const button = document.getElementById(`toggle-btn-${alias}`);
+    const togglebutton = document.getElementById(`toggle-btn-${alias}`);
+    const attachBtn = document.getElementById(`attach-btn-${alias}`);
 
     fetch(`/api/status/${alias}`)
         .then(res => res.json())
@@ -33,21 +34,26 @@ function checkConnectionStatus(alias) {
             if (el) {
                 if (data.connected) {
                     el.innerHTML = '🔌 <span style="color:deepskyblue">Connected</span>';
+                    const isConnected = true;
                 } else {
                     el.innerHTML = '❌ <span style="color:gray">Not Connected</span>';
+                    const isConnected = false;
                 }
             }
 
-            if (button) {
+            if (togglebutton) {
                 if (data.connected) {
-                    button.classList.remove("btn-primary");
-                    button.classList.add("btn-danger");
-                    button.textContent = "Disconnect";
+                    togglebutton.classList.remove("btn-primary");
+                    togglebutton.classList.add("btn-danger");
+                    togglebutton.textContent = "Disconnect";
+                    attachBtn.style.display = "inline-block";
                 } else {
-                    button.classList.remove("btn-danger");
-                    button.classList.add("btn-primary");
-                    button.textContent = "Connect";
+                    togglebutton.classList.remove("btn-danger");
+                    togglebutton.classList.add("btn-primary");
+                    togglebutton.textContent = "Connect";
+                    attachBtn.style.display = "none";
                 }
+
             }
         });
 }
@@ -94,8 +100,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         </div>
                         <div class="mt-2 d-grid gap-2">
                             <button id="toggle-btn-${alias}" class="btn btn-sm btn-primary" onclick="toggleConnection('${alias}', this)"> Connect </button>
-                            <button class="btn btn-sm btn-dark w-100" onclick="showDetails('${alias}')">Details 🔍</button>
-                            <button id="attach-btn-${alias}" class="btn btn-secondary" style="display:none;" onclick="attach('${alias}')"> 🖥️ Attach</button>
+                            <button class="btn btn-sm btn-light w-100" onclick="showDetails('${alias}')">Details 🔍</button>
+                            <button id="attach-btn-${alias}" class="btn btn-sm btn-secondary" style="${isConnected ? 'display:inline-block;' : 'display:none;'}" onclick="attach('${alias}')"> 🖥️ Attach</button>
                             <button class="btn btn-sm btn-warning me-2 w-100" onclick="attach('${alias}')">Attach</button>
                             <button class="btn btn-sm btn-outline-light me-2 w-100" onclick="editProfile('${alias}')">Edit</button>
                             <button class="btn btn-sm btn-info w-100" onclick="downloadLog('${alias}')">Get Log</button>
@@ -309,15 +315,12 @@ function toggleConnection(alias, button) {
                 fetch(`/api/disconnect/${alias}`, { method: 'POST' })
                     .then(res => res.json())
                     .then(() => {
+
                         button.classList.remove("btn-danger");
                         button.classList.add("btn-primary");
                         button.textContent = "Connect";
-
-                        // ✅ Hide attach button
-                        const attachBtn = document.getElementById(`attach-btn-${alias}`);
-                        if (attachBtn) attachBtn.style.display = "none";
-
                         checkConnectionStatus(alias);
+
                     })
                     .catch(() => {
                         alert("❌ Error disconnecting.");
@@ -334,20 +337,16 @@ function toggleConnection(alias, button) {
 
                         if (
                             status === "connected" ||
-                            message.includes("connected")
-
+                            message.includes("connected");
                         ) {
                             button.classList.remove("btn-primary");
                             button.classList.add("btn-danger");
                             button.textContent = "Disconnect";
-                            // ✅ Show attach button
-                            const attachBtn = document.getElementById(`attach-btn-${alias}`);
-                            if (attachBtn) attachBtn.style.display = "inline-block";
-
 
                         } else {
                             alert("❌ Failed to connect: " + (resp.message || "Unknown error"));
                             button.textContent = originalText;
+
                         }
 
                         checkConnectionStatus(alias);
