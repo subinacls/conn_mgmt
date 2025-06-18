@@ -23,30 +23,34 @@ function checkHealthStatus(alias) {
     }
 }
 
-
 function checkConnectionStatus(alias) {
     const el = document.getElementById(`status-connect-${alias}`);
-    const lastSeenEl = document.getElementById(`last-seen-${alias}`);
-    if (el) {
-        el.innerHTML = '🔄 Checking...';
-        fetch(`/api/status/${alias}`)
-            .then(res => res.json())
-            .then(data => {
+    const button = document.getElementById(`toggle-btn-${alias}`);
+
+    fetch(`/api/status/${alias}`)
+        .then(res => res.json())
+        .then(data => {
+            if (el) {
                 if (data.connected) {
                     el.innerHTML = '🔌 <span style="color:deepskyblue">Connected</span>';
-                    if (lastSeenEl) lastSeenEl.style.display = "none";
                 } else {
                     el.innerHTML = '❌ <span style="color:gray">Not Connected</span>';
-                    if (lastSeenEl) lastSeenEl.style.display = "inline";
                 }
-            })
-            .catch(() => {
-                el.innerHTML = '⚠️ <span style="color:red">Error</span>';
-                if (lastSeenEl) lastSeenEl.style.display = "inline";
-            });
-    }
-}
+            }
 
+            if (button) {
+                if (data.connected) {
+                    button.classList.remove("btn-primary");
+                    button.classList.add("btn-danger");
+                    button.textContent = "Disconnect";
+                } else {
+                    button.classList.remove("btn-danger");
+                    button.classList.add("btn-primary");
+                    button.textContent = "Connect";
+                }
+            }
+        });
+}
 
 document.addEventListener("DOMContentLoaded", () => {
     const profileList = document.getElementById("profileList");
@@ -85,13 +89,12 @@ document.addEventListener("DOMContentLoaded", () => {
                             <div id="status-connect-${alias}">🔄 Checking...</div>
                         </div>
                         <div class="mt-2 d-grid gap-2">
-                            <button class="btn btn-sm btn-primary me-2 w-100" onclick="connect('${alias}')">Connect</button>
+                            <button id="toggle-btn-${alias}" class="btn btn-primary" onclick="toggleConnection('${alias}', this)"> Connect </button> <span id="status-connect-${alias}"></span>
                             <button class="btn btn-sm btn-dark w-100" onclick="showDetails('${alias}')">Details 🔍</button>
                             <button class="btn btn-sm btn-danger" onclick="closeTerminal()">❌ Close</button>
                             <button class="btn btn-sm btn-warning me-2 w-100" onclick="attach('${alias}')">Attach</button>
                             <button class="btn btn-sm btn-outline-light me-2 w-100" onclick="editProfile('${alias}')">Edit</button>
                             <button class="btn btn-sm btn-info w-100" onclick="downloadLog('${alias}')">Get Log</button>
-                            <button class="btn btn-sm btn-danger me-2 w-100" onclick="disconnect('${alias}')">Disconnect</button>
                             <button class="btn btn-sm btn-danger w-100" onclick="deleteProfile('${alias}')">Delete</button>
                             <button class="btn btn-sm mt-1 w-100" style="background-color: #28a745; color: #fff; font-weight: bold;" onclick="injectKey('${alias}')">🔑 Inject Public Key</button>
                             <button class="btn btn-sm btn-outline-warning mt-1 w-100" onclick="promptAndExecute('${alias}')">🖥️ Run Command</button>
@@ -281,37 +284,71 @@ function downloadLog(alias) {
 
 function toggleConnection(alias, button) {
     button.disabled = true;
+    const originalText = button.textContent;
     button.textContent = "Processing...";
 
     fetch(`/api/status/${alias}`)
         .then(res => res.json())
         .then(data => {
             if (data.connected) {
+                // If connected, disconnect
                 fetch(`/api/disconnect/${alias}`, { method: 'POST' })
+                    .then(res => res.json())
                     .then(() => {
                         button.classList.remove("btn-danger");
                         button.classList.add("btn-primary");
                         button.textContent = "Connect";
-                        button.disabled = false;
                         checkConnectionStatus(alias);
-                    });
+                    })
+                    .catch(() => {
+                        alert("❌ Error disconnecting.");
+                        button.textContent = originalText;
+                    })
+                    .finally(() => button.disabled = false);
             } else {
+                // If not connected, connect
                 fetch(`/api/connect/${alias}`, { method: 'POST' })
                     .then(res => res.json())
                     .then(resp => {
-                        if (resp.status === "connected") {
+                        const status = resp.status?.toLowerCase() || "";
+                        const message = resp.message?.toLowerCase() || "";
+
+                        if (
+                            status === "connected" ||
+                            message.includes("connected")
+                        ) {
                             button.classList.remove("btn-primary");
                             button.classList.add("btn-danger");
                             button.textContent = "Disconnect";
                         } else {
                             alert("❌ Failed to connect: " + (resp.message || "Unknown error"));
+                            button.textContent = originalText;
                         }
-                        button.disabled = false;
+
                         checkConnectionStatus(alias);
-                    });
+                    })
+                    .catch(() => {
+                        alert("❌ Error connecting.");
+                        button.textContent = originalText;
+                    })
+                    .finally(() => button.disabled = false);
             }
+        })
+        .catch(() => {
+            alert("❌ Failed to check status.");
+            button.textContent = originalText;
+            button.disabled = false;
         });
 }
+
+
+document.addEventListener("DOMContentLoaded", () => {
+    const aliases = document.querySelectorAll("[id^=toggle-btn-]");
+    aliases.forEach(el => {
+        const alias = el.id.replace("toggle-btn-", "");
+        checkConnectionStatus(alias);
+    });
+});
 
 function openTerminal(alias) {
     document.getElementById("terminalModal").style.display = "block";
