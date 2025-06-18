@@ -98,10 +98,26 @@ function checkRemoteProfile(alias) {
                 el.innerHTML = `⚠️ <span style="color:orange">${data.error}</span>`;
             } else {
                 el.innerHTML = `
-                    🧠 <span style="color:#00e1ff">${data.user}</span> • 
-                    ${data.hostname} • 
-                    ${data.os} ${data.arch} 
-                    ${data.is_root ? '<span style="color:lime">✔ sudo</span>' : '<span style="color:gray">✖ no sudo</span>'}
+                    <table class="table table-sm table-borderless text-white mb-0" style="font-size: 0.9rem;">
+                    <tbody>
+                        <tr>
+                        <td>🧠 Host</td>
+                        <td><span style="color:#00e1ff;">${data.hostname}</span></td>
+                        </tr>
+                        <tr>
+                        <td>👤 User</td>
+                        <td><span style="color:#00e1ff;">${data.user}</span></td>
+                        </tr>
+                        <tr>
+                        <td>🔐 Sudo</td>
+                        <td>
+                            ${data.has_sudo
+                            ? '<span style="color:lime">✔ sudo</span>'
+                            : '<span style="color:gray">✖ no sudo</span>'}
+                        </td>
+                        </tr>
+                    </tbody>
+                    </table>
                 `;
             }
         })
@@ -164,7 +180,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                     <div id="status-connect-${alias}">🔄 Checking...</div>
                                 </div>
 
-                                <div id="status-profile-${alias}" class="text-info small">🔄 Checking...</div>
+                                <div id="status-profile-${alias}" style="${isConnected ? 'display:inline-block;' : 'display:none;'}" class="text-info small">🔄 Checking...</div>
                                 <button></button>
 
                                 <div class="mt-2 d-grid gap-2">

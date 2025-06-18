@@ -107,11 +107,15 @@ def introspect_remote_host(alias):
             profile["sudo_details"] = "sudo not installed"
         else:
             # Now use sudo -l -n to check for permission
-            sudo_output, sudo_error = run("sudo -l -n 2>&1")
-            if "may run the following" in sudo_output:
+            sudo_output, sudo_err = run("sudo -n -l")
+            profile["has_sudo"] = bool(sudo_output and "may run the following" in sudo_output)
+            profile["sudo_raw"] = sudo_output
+            profile["sudo_error"] = sudo_err
+
+            if sudo_output and "may run the following" in sudo_output:
                 profile["has_sudo"] = True
-                profile["sudo_details"] = sudo_output
-            elif "a password is required" in sudo_error:
+                profile["sudo_details"] = "passwordless sudo is available"
+            elif "a password is required" in sudo_error.lower():
                 profile["has_sudo"] = True
                 profile["sudo_details"] = "sudo available but requires password"
             else:
