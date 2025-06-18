@@ -41,6 +41,12 @@ function checkConnectionStatus(alias) {
                 }
             }
 
+            if (!togglebutton && !attachBtn) {
+                // DOM not ready — skip update
+                return;
+            }
+
+
             if (togglebutton) {
                 if (data.connected) {
                     togglebutton.classList.remove("btn-primary");
@@ -71,58 +77,79 @@ document.addEventListener("DOMContentLoaded", () => {
             .then(data => {
                 profileList.innerHTML = "";
                 Object.entries(data).forEach(([alias, info]) => {
+                    fetch(`/api/status/${alias}`)
+                        .then(res => res.json())
+                        .then(status => {
+                            const isConnected = status.connected === true;
 
-                    const col = document.createElement("div");
-                    col.className = "col-12 col-sm-6 col-md-4 col-lg-3 d-flex align-items-stretch";
+                            const col = document.createElement("div");
+                            col.className = "col-12 col-sm-6 col-md-4 col-lg-3 d-flex align-items-stretch";
 
-                    const jumpInfo = info.jumpHost    ? `<br><span class="text-warning">🛰️ Jump via: <code>${info.jumpHost}</code></span>`    : "";
-                    const lastSeen = info.last_seen  ? `<br><small class="text-muted" id="last-seen-${alias}" style="display:none">Last Seen: ${info.last_seen}</small>`  : "";
-                    const card = document.createElement("div");
+                            const jumpInfo = info.jumpHost
+                                ? `<br><span class="text-warning">🛰️ Jump via: <code>${info.jumpHost}</code></span>` : "";
+                            const lastSeen = info.last_seen
+                                ? `<br><small class="text-muted" id="last-seen-${alias}" style="display:none">Last Seen: ${info.last_seen}</small>` : "";
 
-                    card.className = "card bg-secondary text-white h-100 p-3";
-                    card.style.minHeight = "200px";  // or adjust to 250px, etc.
+                            const card = document.createElement("div");
+                            card.className = "card bg-secondary text-white h-100 p-3";
+                            card.style.minHeight = "200px";
 
-                    const statusSpan = document.createElement("span");
-                    statusSpan.id = `status-${alias}`;
-                    // statusSpan.innerHTML = '⏳ Checking...';
-                    card.appendChild(statusSpan);
+                            const statusSpan = document.createElement("span");
+                            statusSpan.id = `status-${alias}`;
+                            card.appendChild(statusSpan);
 
-                    card.innerHTML += `
-                        <div class="delete-tab" onclick="deleteProfile('${alias}')">
-                          ✖
-                        </div>
-                        <strong>${alias}</strong> → ${info.host}:${info.port} (${info.username})
-                        ${jumpInfo}
-                        ${lastSeen}
-                        <div class="d-flex justify-content-between mt-1 mb-2">
-                            <div id="status-health-${alias}">🔄 Checking...</div>
-                            <div id="status-connect-${alias}">🔄 Checking...</div>
-                        </div>
-                        <div class="mt-2 d-grid gap-2">
-                            <button id="toggle-btn-${alias}" class="btn btn-sm btn-primary" onclick="toggleConnection('${alias}', this)"> Connect </button>
-                            <button class="btn btn-sm btn-light w-100" onclick="showDetails('${alias}')">Details 🔍</button>
-                            <button id="attach-btn-${alias}" class="btn btn-sm btn-secondary" style="${isConnected ? 'display:inline-block;' : 'display:none;'}" onclick="attach('${alias}')"> 🖥️ Attach</button>
-                            <button class="btn btn-sm btn-warning me-2 w-100" onclick="attach('${alias}')">Attach</button>
-                            <button class="btn btn-sm btn-outline-light me-2 w-100" onclick="editProfile('${alias}')">Edit</button>
-                            <button class="btn btn-sm btn-info w-100" onclick="downloadLog('${alias}')">Get Log</button>
-                            <button class="btn btn-sm mt-1 w-100" style="background-color: #28a745; color: #fff; font-weight: bold;" onclick="injectKey('${alias}')">🔑 Inject Public Key</button>
-                            <button class="btn btn-sm btn-outline-warning mt-1 w-100" onclick="promptAndExecute('${alias}')">🖥️ Run Command</button>
-                            <button class="btn btn-sm btn-outline-warning mt-1 w-100" onclick="promptExecuteScript('${alias}')">⚙️ Run Bash Script</button>
-                        </div>
-                    `;
+                            card.innerHTML += `
+                                <div class="delete-tab" onclick="deleteProfile('${alias}')">✖</div>
+                                <strong>${alias}</strong> → ${info.host}:${info.port} (${info.username})
+                                ${jumpInfo}
+                                ${lastSeen}
+                                <div class="d-flex justify-content-between mt-1 mb-2">
 
-                    col.appendChild(card);
-                    profileList.appendChild(col);
+                                    <div id="status-health-${alias}">🔄 Checking...</div>
+                                    <div id="status-connect-${alias}">🔄 Checking...</div>
 
-                    // profileList.appendChild(card);
+                                </div>
 
-                    // Immediately check health
-                    checkHealthStatus(alias);
-                    checkConnectionStatus(alias);
-                    //checkHealth(alias);
-                    // Then periodically every 30 seconds
-                    setInterval(() => checkHealth(alias), 30000);
+                                <div class="mt-2 d-grid gap-2">
+                                    <button></button>
+                                    <button id="toggle-btn-${alias}" class="btn btn-sm ${isConnected ? 'btn-danger' : 'btn-primary'}"
+                                        onclick="toggleConnection('${alias}', this)">
+                                        ${isConnected ? 'Disconnect' : 'Connect'}
+                                    </button>
+                                    <button class="btn btn-sm btn-light w-100" onclick="showDetails('${alias}')">Details 🔍</button>
+                                    <button class="btn btn-sm btn-outline-light me-2 w-100" onclick="editProfile('${alias}')">Edit</button>
 
+                                    <hr>
+
+                                    <button id="attach-btn-${alias}" class="btn btn-sm btn-warning me-2 w-100"
+                                        style="${isConnected ? 'display:inline-block;' : 'display:none;'}"
+                                        onclick="attach('${alias}')">🖥️ XTerm <b/utton>
+
+                                    <button id="log-btn-${alias}" class="btn btn-sm btn-info w-100"
+                                        style="${isConnected ? 'display:inline-block;' : 'display:none;'}"
+                                        onclick="downloadLog('${alias}')">📄 Term Logs</button>
+
+                                    <button id="injectkey-btn-${alias}" class="btn btn-sm mt-1 w-100"
+                                        style="${isConnected ? 'background-color: #28a745; color: #fff; font-weight: bold;' : 'display:none;'}"
+                                        onclick="injectKey('${alias}')">🔑 Inject Keys</button>
+
+                                    <button class="btn btn-sm btn-outline-info mt-1 w-100 fw-bold rounded-2 shadow-sm"
+                                        style="${isConnected ? '' : 'display:none;'}"
+                                        onclick="promptAndExecute('${alias}')">⚠️ Run Command</button>
+
+                                    <button class="btn btn-sm btn-outline-warning mb-3 collapsed mt-1 w-100 fw-bold rounded-2 shadow-sm"
+                                        style="${isConnected ? '' : 'display:none;'}"
+                                        onclick="promptExecuteScript('${alias}')">⚙️ Run Bash Script</button>
+                                </div>
+                            `;
+
+                            col.appendChild(card);
+                            profileList.appendChild(col);
+
+                            checkHealthStatus(alias);
+                            checkConnectionStatus(alias);
+                            setInterval(() => checkHealth(alias), 30000);
+                        });
                 });
             });
     }
@@ -319,7 +346,8 @@ function toggleConnection(alias, button) {
                         button.classList.remove("btn-danger");
                         button.classList.add("btn-primary");
                         button.textContent = "Connect";
-                        checkConnectionStatus(alias);
+
+                        refreshProfiles();
 
                     })
                     .catch(() => {
@@ -332,12 +360,13 @@ function toggleConnection(alias, button) {
                 fetch(`/api/connect/${alias}`, { method: 'POST' })
                     .then(res => res.json())
                     .then(resp => {
+
                         const status = resp.status?.toLowerCase() || "";
                         const message = resp.message?.toLowerCase() || "";
 
                         if (
                             status === "connected" ||
-                            message.includes("connected");
+                            message.includes("connected")
                         ) {
                             button.classList.remove("btn-primary");
                             button.classList.add("btn-danger");
@@ -349,7 +378,7 @@ function toggleConnection(alias, button) {
 
                         }
 
-                        checkConnectionStatus(alias);
+                        refreshProfiles();
                     })
                     .catch(() => {
                         alert("❌ Error connecting.");
