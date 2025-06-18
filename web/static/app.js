@@ -95,7 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="mt-2 d-grid gap-2">
                             <button id="toggle-btn-${alias}" class="btn btn-sm btn-primary" onclick="toggleConnection('${alias}', this)"> Connect </button>
                             <button class="btn btn-sm btn-dark w-100" onclick="showDetails('${alias}')">Details 🔍</button>
-                            <button id="attach-btn-${alias}" class="btn btn-secondary" style="display:none;" onclick="attachSession('${alias}')"> 🖥️ Attach</button>
+                            <button id="attach-btn-${alias}" class="btn btn-secondary" style="display:none;" onclick="attach('${alias}')"> 🖥️ Attach</button>
                             <button class="btn btn-sm btn-warning me-2 w-100" onclick="attach('${alias}')">Attach</button>
                             <button class="btn btn-sm btn-outline-light me-2 w-100" onclick="editProfile('${alias}')">Edit</button>
                             <button class="btn btn-sm btn-info w-100" onclick="downloadLog('${alias}')">Get Log</button>
@@ -290,6 +290,12 @@ function downloadLog(alias) {
     window.open(`/api/sessions/logs/${alias}`, "_blank");
 }
 
+window.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("[id^='attach-btn-']").forEach(btn => {
+        btn.style.display = "none";
+    });
+});
+
 function toggleConnection(alias, button) {
     button.disabled = true;
     const originalText = button.textContent;
@@ -329,14 +335,15 @@ function toggleConnection(alias, button) {
                         if (
                             status === "connected" ||
                             message.includes("connected")
+
                         ) {
                             button.classList.remove("btn-primary");
                             button.classList.add("btn-danger");
                             button.textContent = "Disconnect";
-
                             // ✅ Show attach button
                             const attachBtn = document.getElementById(`attach-btn-${alias}`);
                             if (attachBtn) attachBtn.style.display = "inline-block";
+
 
                         } else {
                             alert("❌ Failed to connect: " + (resp.message || "Unknown error"));
