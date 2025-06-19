@@ -130,14 +130,6 @@ function checkRemoteProfile(alias) {
 }
 
 
-
-document.addEventListener("DOMContentLoaded", () => {
-    const profileList = document.getElementById("profileList");
-    const sessionList = document.getElementById("sessionList");
-    const addForm = document.getElementById("addForm");
-
-    populateSFTPAliases()
-
     function refreshProfiles() {
         fetch("/api/profiles")
             .then(res => res.json())
@@ -267,7 +259,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
                             checkHealthStatus(alias);
                             checkConnectionStatus(alias);
-                            setInterval(() => checkHealthStatus(alias), 30000);
+                            setInterval(() => checkHealthStatus(alias), 60000);
+                            setInterval(() => checkConnectionStatus(alias), 60000);
                         });
                 });
             });
@@ -321,6 +314,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
+document.addEventListener("DOMContentLoaded", () => {
+    const profileList = document.getElementById("profileList");
+    const sessionList = document.getElementById("sessionList");
+    const addForm = document.getElementById("addForm");
+
+    populateSFTPAliases()
 
     addForm.addEventListener("submit", e => {
         e.preventDefault();
@@ -470,7 +469,8 @@ function toggleConnection(alias, button) {
 
                     })
                     .catch(() => {
-                        alert("❌ Error disconnecting.");
+                        console.error("Connection error:", err);
+                        alert("❌ Error disconnecting:\n" + (err.message || err));
                         button.textContent = originalText;
                     })
                     .finally(() => button.disabled = false);
@@ -499,8 +499,9 @@ function toggleConnection(alias, button) {
 
                         refreshProfiles();
                     })
-                    .catch(() => {
-                        alert("❌ Error connecting.");
+                    .catch((err) => {
+                        console.error("Connection error:", err);
+                        alert("❌ Error connecting:\n" + (err.message || err));
                         button.textContent = originalText;
                     })
                     .finally(() => button.disabled = false);

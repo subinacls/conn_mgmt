@@ -115,12 +115,12 @@ def introspect_remote_host(alias):
             if sudo_output and "may run the following" in sudo_output:
                 profile["has_sudo"] = True
                 profile["sudo_details"] = "passwordless sudo is available"
-            elif "a password is required" in sudo_error.lower():
+            elif "a password is required" in sudo_err.lower():
                 profile["has_sudo"] = True
                 profile["sudo_details"] = "sudo available but requires password"
             else:
                 profile["has_sudo"] = False
-                profile["sudo_details"] = sudo_output or sudo_error
+                profile["sudo_details"] = sudo_output or sudo_err
 
         profile["sudo_debug"] = sudo_err if sudo_err else sudo_check
 
