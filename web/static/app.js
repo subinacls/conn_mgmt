@@ -589,9 +589,10 @@ function listRemote() {
         if (data.files) {
             data.files.forEach(file => {
                 const row = document.createElement("tr");
+                const icon = file.permissions.startsWith('d') ? '📁' : '📄';
                 row.innerHTML = `
                     <td>${file.isdir ? "📁" : "📄"} ${file.filename}</td>
-                    <td><code>${file.permissions}</code></td>
+                    <td>${icon}<code>${file.permissions}</code></td>
                     <td>${file.isdir ? "-" : file.size}</td>
                     <td>${new Date(file.mtime * 1000).toLocaleString()}</td>
                     <td>
