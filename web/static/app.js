@@ -15,6 +15,9 @@ function showIntrospection(alias) {
         .then(data => {
             if (data.error) return alert("❌ " + data.error);
 
+            if (data.has_sudo) {
+                insertSudoElevateUI(alias, data.sudo_details);
+            }
             const summary = `
 Alias: ${data.alias}
 ------------------------
@@ -170,6 +173,7 @@ function checkRemoteProfile(alias) {
 
                                     <div id="status-health-${alias}">🔄 Checking...</div>
                                     <div id="status-connect-${alias}">🔄 Checking...</div>
+                                    <div id="sudo-test-{{ alias }}" class="mt-2 text-warning"> 🔄 Checking ...</div>
                                 </div>
 
                                 <div id="status-profile-${alias}" style="${isConnected ? 'display:inline-block;' : 'display:none;'}" class="text-info small">🔄 Checking...</div>
@@ -587,6 +591,7 @@ function listRemote() {
                 const row = document.createElement("tr");
                 row.innerHTML = `
                     <td>${file.isdir ? "📁" : "📄"} ${file.filename}</td>
+                    <td><code>${file.permissions}</code></td>
                     <td>${file.isdir ? "-" : file.size}</td>
                     <td>${new Date(file.mtime * 1000).toLocaleString()}</td>
                     <td>
@@ -806,6 +811,49 @@ function executeBase64Script(alias, rawScript) {
         alert("❌ Failed to execute script.");
     });
 }
+
+
+function insertSudoElevateUI(alias, details) {
+    const el = document.getElementById(`sudo-test-${alias}`);
+    if (!el) return;
+
+    el.innerHTML = `
+        ✅ ${details}<br>
+        <a href="#" class="text-warning" onclick="launchElevatedSession('${alias}')">🚀 Launch Elevated</a>
+        <button class="btn btn-sm btn-outline-warning ms-2" onclick="backgroundElevatedSession('${alias}')">⬇ Background</button>
+    `;
+}
+
+function launchElevatedSession(alias) {
+    fetch(`/api/start_elevated/${alias}?elevate=true`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) {
+                alert(`❌ ${data.error}`);
+            } else {
+                alert("✅ Elevated session started.");
+            }
+        });
+}
+
+function backgroundElevatedSession(alias) {
+    const name = prompt("Enter session name:", `${alias}_elevated`);
+    if (!name) return;
+
+    fetch(`/api/start_elevated/${alias}?elevate=true&background=true&session_name=${encodeURIComponent(name)}`, {
+        method: 'POST'
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) {
+            alert(`❌ ${data.error}`);
+        } else {
+            alert(`✅ Background session '${name}' started.`);
+        }
+    });
+}
+
+
 
 function closeTerminal() {
     if (term) term.dispose();

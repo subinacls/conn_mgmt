@@ -100,12 +100,30 @@ class SSHManager:
         cmd.append(f"{username}@{host}")
         print(" ".join(cmd))
 
+        # Elevate via sudo -i if requested
+        if elevate:
+            cmd.append("-t")
+            cmd.append("sudo -i")
+
+        logging.info(f"[{alias}] Launching SSH command: {' '.join(cmd)}")
+        print(" ".join(cmd))
+
+        if background:
+            subprocess.Popen(cmd)
+        else:
+            subprocess.run(cmd)
+
+
+
         # log the cmd
+        '''
         logging.info(f"[{alias}] Launching SSH command: {' '.join(cmd)}")
         print(" ".join(cmd))
 
         # Start the SSH session in a new xterm window
         subprocess.Popen(cmd)
+        '''
+
 
 
 

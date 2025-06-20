@@ -129,6 +129,29 @@ def introspect_remote_host(alias):
         return jsonify({"error": str(e)}), 500
 
 
+
+@app.route("/api/start_elevated/<alias>", methods=["POST"])
+def start_elevated_session(alias):
+    """
+    Launches an elevated SSH session (optionally backgrounded and named).
+    """
+    profiles = load_profiles()
+    profile = profiles.get(alias)
+    if not profile:
+        return jsonify({"error": "Profile not found"}), 404
+
+    elevate = request.args.get("elevate", "true").lower() == "true"
+    background = request.args.get("background", "false").lower() == "true"
+    session_name = request.args.get("session_name") or f"{alias}_elevated"
+
+    try:
+        ssh_mgr.start_session(alias, profile, elevate=elevate, background=background, session_name=session_name)
+        return jsonify({"message": f"Elevated session started for {alias}"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
 @app.route("/api/profiles", methods=["POST"])
 def add_profile():
     data = request.json
@@ -426,6 +449,9 @@ def health_check(alias):
     except Exception as e:
         return jsonify({"status": "Connection status failed", "error": str(e)})
 
+def format_permissions(mode):
+    return stat.filemode(mode)
+
 @app.route("/api/sftp/list", methods=["POST"])
 def sftp_list():
     data = request.json
@@ -438,6 +464,7 @@ def sftp_list():
             files.append({
                 "filename": entry.filename,
                 "longname": entry.longname,
+                "permissions": format_permissions(entry.st_mode),
                 "size": entry.st_size,
                 "mtime": entry.st_mtime,
                 "isdir": stat.S_ISDIR(entry.st_mode)
