@@ -232,10 +232,16 @@ function checkRemoteProfile(alias) {
                                 <div class="d-flex justify-content-between mt-1 mb-2">
                                     <div id="status-health-${alias}">🔄 Checking...</div>
                                     <div id="status-connect-${alias}">🔄 Checking...</div>
-                                    <div id="sudo-test-${alias}" class="mt-2 text-warning"> 🔄 Checking ...</div>
                                 </div>
 
                                 <div id="status-profile-${alias}" style="${isConnected ? 'display:inline-block;' : 'display:none;'}" class="text-info small">🔄 Checking...</div>
+
+                                <button></button>
+
+                                <div>
+                                    <div id="sudo-test-${alias}" class="mt-2 text-warning"> 🔄 Checking ...</div>
+                                </div>
+
                                 <button></button>
 
                                 <div class="mt-2 d-grid gap-2">
@@ -269,7 +275,7 @@ function checkRemoteProfile(alias) {
                                     <!-- Attach (Terminal) -->
                                     <button id="attach-btn-${alias}" class="btn btn-sm btn-warning me-2 w-100"
                                         style="${isConnected ? 'display:inline-block;' : 'display:none;'}"
-                                        onclick="attach('${alias}')"
+                                        onclick="attach('${alias}', false)"
                                         data-bs-toggle="tooltip"
                                         title="Open a remote terminal session in XTerm">
                                         🖥️ XTerm
@@ -352,32 +358,40 @@ function checkRemoteProfile(alias) {
     }
 
 
-    function attach(alias) {
-        // Destroy and re-create terminal
-        if (term) term.dispose();
-        term = new Terminal({ cursorBlink: true, theme: { background: "#000000" } });
-        term.open(document.getElementById("terminal"));
-        term.focus();
+function attach(alias, elevate = false) {
+    if (term) term.dispose();
+    term = new Terminal({
+        cols: 120,
+        rows: 40,
+        scrollback: 10000,
+        convertEol: true,
+        cursorBlink: true,
+        theme: { background: "#000000" }
+    });
+    term.open(document.getElementById("terminal"));
+    term.focus();
 
-        // Show modal
-        document.getElementById("terminalModal").style.display = "block";
+    // Show terminal modal
+    document.getElementById("terminalModal").style.display = "block";
 
-        // WebSocket bind
-        if (!socket) {
-            socket = io();
-        }
-
-        // Bind output and input events
-        socket.off("output");
-        socket.on("output", data => term.write(data));
-
-        term.onData(data => {
-            socket.emit("command", { data });
-        });
-
-        // Emit attach request
-        socket.emit("attach", { alias });
+    // Ensure socket is ready
+    if (!socket) {
+        socket = io();
     }
+
+    // Setup clean listener
+    socket.off("shell_output");
+    socket.on("shell_output", data => {
+        term.write(data);
+    });
+
+    term.onData(data => {
+        socket.emit("shell_input", data);
+    });
+
+    // Correct emit (with elevate flag)
+    socket.emit("start_session", { alias, elevate });
+}
 
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -589,7 +603,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
-function openTerminal(alias) {
+function openTerminal(alias, elevate = false) {
     document.getElementById("terminalModal").style.display = "block";
 
     term = new Terminal({
@@ -603,8 +617,8 @@ function openTerminal(alias) {
     term.focus();
 
     socket = io();
-    socket.emit("start_session", { alias });
 
+    socket.emit("start_session", { alias, elevate });  // now dynamic
     socket.on("shell_output", (data) => {
         console.log("[RECV]", data);
         term.write(data);
@@ -881,27 +895,20 @@ function insertSudoElevateUI(alias, details) {
     if (!el) return;
     el.innerHTML = `
         ✅ ${details}<br>
-        <a href="#" class="text-warning" onclick="launchElevatedSession('${alias}')">🚀 Launch Elevated</a>
+        <button class="btn btn-sm btn-outline-warning ms-2" onclick="launchElevatedSession('${alias}')">🚀 Root Shell</button>
         <button class="btn btn-sm btn-outline-warning ms-2" onclick="backgroundElevatedSession('${alias}')">⬇ Background</button>
+
     `;
 }
 
+
 function launchElevatedSession(alias) {
-    fetch(`/api/start_elevated/${alias}?elevate=true`, { method: 'POST' })
-        .then(res => res.json())
-        .then(data => {
-            if (data.error) {
-                alert(`❌ ${data.error}`);
-            } else {
-                alert("✅ Elevated session started.");
-                insertSudoElevateUI(alias, "Elevated root shell created.");
-                attack(alias);
-            }
-        })
-        .catch(err => {
-            console.error("Error launching elevated session:", err);
-            alert("❌ Could not start elevated session.");
-        });
+    try {
+        attach(alias, true); // open root shell via modal
+    } catch (err) {
+        console.error("Error launching elevated terminal:", err);
+        alert("❌ Could not launch elevated shell.");
+    }
 }
 
 function backgroundElevatedSession(alias) {

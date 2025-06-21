@@ -332,15 +332,17 @@ def get_profiles():
 @socketio.on("start_session")
 def start_session(data):
     alias = data.get("alias")
+    elevate = data.get("elevate", False)
     sid = request.sid
+
     profiles = load_profiles()
     profile = profiles.get(alias)
-
     if not profile:
-        emit("shell_output", "[ERROR] Unknown alias\n")
+        emit("shell_output", "[ERROR] Unknown alias\n", to=sid)
         return
 
     try:
+        # Fetch or establish session
         channel = background_sessions.get(alias)
         if not channel:
             ssh_mgr.connect(
@@ -353,43 +355,47 @@ def start_session(data):
             )
             client = ssh_mgr.sessions[alias]
             channel = client.invoke_shell()
+            background_sessions[alias] = channel
+            emit("shell_output", "[+] New SSH session started\n", to=sid)
+        else:
+            emit("shell_output", "[*] Reattaching to existing session\n", to=sid)
 
+        # Track session by socket sid
+        active_channels[sid] = channel
+        ssh_mgr.shells[alias] = channel
+
+        # Elevate if requested
         if elevate:
             channel.send("sudo -i\n")
             time.sleep(1)
             output = ""
             if channel.recv_ready():
                 output = channel.recv(1024).decode("utf-8", errors="ignore")
+                emit("shell_output", output, to=sid)
                 if "password" in output.lower():
-                    return "ERROR: sudo elevation failed or requires password"
+                    emit("shell_output", "[ERROR] sudo requires a password or failed\n", to=sid)
+                    return
 
-        self.shells[alias] = channel
-        return "OK"
-
-        background_sessions[alias] = channel
-
-        active_channels[sid] = channel
-
-        def read_output():
-            try:
-                while alias in background_sessions and sid in active_channels:
-                    r, _, _ = select.select([channel], [], [], 0.1)
-                    if r:
-                        data = channel.recv(4096).decode(errors="ignore")
-                        socketio.emit("shell_output", data, to=sid)
-            except Exception as e:
-                socketio.emit("shell_output", f"[ERROR] Read failure: {e}\n", to=sid)
-
+        # Launch a background reader thread
         if alias not in reader_threads or not reader_threads[alias].is_alive():
-            thread = threading.Thread(target=read_output, daemon=True)
-            thread.start()
-            reader_threads[alias] = thread
+            def read_output():
+                try:
+                    while sid in active_channels:
+                        r, _, _ = select.select([channel], [], [], 0.1)
+                        if channel in r:
+                            output = channel.recv(4096).decode("utf-8", errors="ignore")
+                            socketio.emit("shell_output", output, to=sid)
+                except Exception as e:
+                    socketio.emit("shell_output", f"[ERROR] Read failure: {e}\n", to=sid)
 
-        emit("shell_output", "[+] Session attached\n")
+            t = threading.Thread(target=read_output, daemon=True)
+            t.start()
+            reader_threads[alias] = t
+
+        emit("shell_output", "[✓] Session attached and active\n", to=sid)
 
     except Exception as e:
-        emit("shell_output", f"[ERROR] {str(e)}\n")
-        return
+        emit("shell_output", f"[ERROR] {str(e)}\n", to=sid)
 
 
 @socketio.on("shell_input")
