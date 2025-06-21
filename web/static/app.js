@@ -225,9 +225,25 @@ function checkRemoteProfile(alias) {
 
                             card.innerHTML += `
                                 <div class="delete-tab" onclick="deleteProfile('${alias}')">✖</div>
-                                <strong>${alias}</strong> → ${info.host}:${info.port} (${info.username})
-                                ${jumpInfo}
-                                ${lastSeen}
+                                <div>
+                                    <strong>${alias}</strong> → ${info.host}:${info.port} (${info.username})
+                                </div>
+                                <div>
+                                    ${jumpInfo}
+                                    ${lastSeen}
+                                </div>
+                                <br>
+                                <hr>
+                                <!-- Connect / Disconnect -->
+                                <button id="toggle-btn-${alias}" class="btn btn-sm ${isConnected ? 'btn-danger' : 'btn-primary'}"
+                                    onclick="toggleConnection('${alias}', this)"
+                                    data-bs-toggle="tooltip"
+                                    title="${isConnected ? 'Disconnect from this host' : 'Establish an SSH connection'}">
+                                    ${isConnected ? 'Disconnect' : 'Connect'}
+                                </button>
+
+                                <br>
+
                                 <hr>
                                 <div class="d-flex justify-content-between mt-1 mb-2">
                                     <div id="status-health-${alias}">🔄 Checking...</div>
@@ -238,21 +254,15 @@ function checkRemoteProfile(alias) {
 
                                 <button></button>
 
+                                <br>
                                 <div>
                                     <div id="sudo-test-${alias}" class="mt-2 text-warning"> 🔄 Checking ...</div>
                                 </div>
+                                <br>
 
                                 <button></button>
 
                                 <div class="mt-2 d-grid gap-2">
-
-                                    <!-- Connect / Disconnect -->
-                                    <button id="toggle-btn-${alias}" class="btn btn-sm ${isConnected ? 'btn-danger' : 'btn-primary'}"
-                                        onclick="toggleConnection('${alias}', this)"
-                                        data-bs-toggle="tooltip"
-                                        title="${isConnected ? 'Disconnect from this host' : 'Establish an SSH connection'}">
-                                        ${isConnected ? 'Disconnect' : 'Connect'}
-                                    </button>
 
                                     <!-- Show SSH Details -->
                                     <button class="btn btn-sm btn-light w-100"
@@ -275,7 +285,7 @@ function checkRemoteProfile(alias) {
                                     <!-- Attach (Terminal) -->
                                     <button id="attach-btn-${alias}" class="btn btn-sm btn-warning me-2 w-100"
                                         style="${isConnected ? 'display:inline-block;' : 'display:none;'}"
-                                        onclick="attach('${alias}', false)"
+                                        onclick="openTerminal('${alias}', false)"
                                         data-bs-toggle="tooltip"
                                         title="Open a remote terminal session in XTerm">
                                         🖥️ XTerm
@@ -895,7 +905,7 @@ function insertSudoElevateUI(alias, details) {
     if (!el) return;
     el.innerHTML = `
         ✅ ${details}<br>
-        <button class="btn btn-sm btn-outline-warning ms-2" onclick="launchElevatedSession('${alias}')">🚀 Root Shell</button>
+        <button class="btn btn-sm btn-outline-warning ms-2" onclick="openTerminal('${alias}', true)">🚀 Root Shell</button>
         <button class="btn btn-sm btn-outline-warning ms-2" onclick="backgroundElevatedSession('${alias}')">⬇ Background</button>
 
     `;

@@ -114,10 +114,10 @@ def introspect_remote_host(alias):
 
             if sudo_output and "may run the following" in sudo_output:
                 profile["has_sudo"] = True
-                profile["sudo_details"] = "passwordless sudo is available"
+                profile["sudo_details"] = "passwordless sudo"
             elif "a password is required" in sudo_err.lower():
                 profile["has_sudo"] = True
-                profile["sudo_details"] = "sudo available but requires password"
+                profile["sudo_details"] = "sudo requires password"
             else:
                 profile["has_sudo"] = False
                 profile["sudo_details"] = sudo_output or sudo_err
@@ -364,17 +364,20 @@ def start_session(data):
         active_channels[sid] = channel
         ssh_mgr.shells[alias] = channel
 
-        # Elevate if requested
+
         if elevate:
             channel.send("sudo -i\n")
-            time.sleep(1)
-            output = ""
-            if channel.recv_ready():
-                output = channel.recv(1024).decode("utf-8", errors="ignore")
-                emit("shell_output", output, to=sid)
-                if "password" in output.lower():
-                    emit("shell_output", "[ERROR] sudo requires a password or failed\n", to=sid)
-                    return
+            time.sleep(0.5)
+
+            buffer = ""
+            while channel.recv_ready():
+                chunk = channel.recv(1024).decode("utf-8", errors="ignore")
+                buffer += chunk
+                time.sleep(0.2)
+                if "$" in buffer or "#" in buffer:  # shell prompt detected
+                    break
+
+            emit("shell_output", buffer, to=sid)
 
         # Launch a background reader thread
         if alias not in reader_threads or not reader_threads[alias].is_alive():
