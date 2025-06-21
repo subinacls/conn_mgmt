@@ -123,13 +123,13 @@ function checkConnectionStatus(alias) {
 
             if (togglebutton) {
                 if (data.connected) {
-                    togglebutton.classList.remove("btn-primary");
+                    togglebutton.classList.remove("btn-outline-warning");
                     togglebutton.classList.add("btn-danger");
                     togglebutton.textContent = "Disconnect";
                 } else {
                     togglebutton.classList.remove("btn-danger");
                     togglebutton.classList.add("btn-outline-warning");
-                    togglebutton.textContent = "Connect";
+                    togglebutton.textContent = "Connect to";
                 }
 
             }
@@ -229,14 +229,14 @@ function checkRemoteProfile(alias) {
 
                                 <div class="d-flex justify-content-start gap-2">
                                     <!-- Connect / Disconnect -->
-                                    <button id="toggle-btn-${alias}" class="btn btn-sm ${isConnected ? 'btn-danger' : 'btn-primary'}"
+                                    <button id="toggle-btn-${alias}" class="btn btn-sm mt-3 ${isConnected ? 'btn-danger' : 'btn-primary'}"
                                         onclick="toggleConnection('${alias}', this)"
                                         data-bs-toggle="tooltip"
                                         title="${isConnected ? 'Disconnect from this host' : 'Establish an SSH connection'}">
                                         ${isConnected ? 'Disconnect' : 'Connect'}
                                     </button>
                                     <!-- Edit Profile -->
-                                    <button class="btn btn-sm btn-outline-light"
+                                    <button class="btn btn-sm btn-outline-light mt-3"
                                         onclick="editProfile('${alias}')"
                                         data-bs-toggle="tooltip"
                                         title="Edit this SSH profile">
@@ -261,11 +261,9 @@ function checkRemoteProfile(alias) {
 
                                 <br>
                                 <div>
-                                    <div id="sudo-test-${alias}" class="mt-2 text-warning"> 🔄 Checking ...</div>
+                                    <div id="sudo-test-${alias}" class="mt-2 text-warning"></div>
                                 </div>
                                 <br>
-
-                                <button></button>
 
                                 <div class="mt-2 d-grid gap-2">
 
@@ -296,25 +294,24 @@ function checkRemoteProfile(alias) {
                                         🔑 Inject Keys
                                     </button>
 
-                                    <button></button>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-sm btn-outline-info mb-3 mt-1 w-100 fw-bold rounded-2 shadow-sm"
+                                            style="${isConnected ? '' : 'display:none;'}"
+                                            onclick="promptAndExecute('${alias}')"
+                                            data-bs-toggle="tooltip"
+                                            title="Execute a single bash command on the remote host">
+                                            ⚙️ CMD
+                                        </button>
 
-                                    <!-- Execute Command -->
-                                    <button class="btn btn-sm btn-outline-info mt-1 w-100 fw-bold rounded-2 shadow-sm"
-                                        style="${isConnected ? '' : 'display:none;'}"
-                                        onclick="promptAndExecute('${alias}')"
-                                        data-bs-toggle="tooltip"
-                                        title="Execute a single bash command on the remote host">
-                                        ⚙️ Run Command
-                                    </button>
-
-                                    <!-- Execute Script -->
-                                    <button class="btn btn-sm btn-outline-warning mb-3 mt-1 w-100 fw-bold rounded-2 shadow-sm"
-                                        style="${isConnected ? '' : 'display:none;'}"
-                                        onclick="promptExecuteScript('${alias}')"
-                                        data-bs-toggle="tooltip"
-                                        title="Paste and run a multi-line bash script on this machine">
-                                        📜 Run Bash Script
-                                    </button>
+                                        <!-- Execute Script -->
+                                        <button class="btn btn-sm btn-outline-warning mb-3 mt-1 w-100 fw-bold rounded-2 shadow-sm"
+                                            style="${isConnected ? '' : 'display:none;'}"
+                                            onclick="promptExecuteScript('${alias}')"
+                                            data-bs-toggle="tooltip"
+                                            title="Paste and run a multi-line bash script on this machine">
+                                            📜 SCRIPT
+                                        </button>
+                                    </div>
                                     <hr>
                                 </div>
 
@@ -540,7 +537,7 @@ function toggleConnection(alias, button) {
 
                         button.classList.remove("btn-danger");
                         button.classList.add("btn-primary");
-                        button.textContent = "Connect to";
+                        button.textContent = "🔌 Connect";
 
                         refreshProfiles();
 
@@ -601,18 +598,36 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function openTerminal(alias, elevate = false) {
-    document.getElementById("terminalModal").style.display = "block";
+   // Show modal
+    const modal = document.getElementById("terminalModal");
+    modal.style.display = "block";
 
-    term = new Terminal({
-        cols: 120,
-        rows: 40,
+    // Ensure the container exists and is clean
+    const container = document.getElementById("terminal");
+    container.innerHTML = "";  // Clear any previous content
+
+    // Initialize terminal
+    const term = new Terminal({
         scrollback: 10000,
         convertEol: true,
-        cursorBlink: true,
+        cursorBlink: true
     });
-    term.open(document.getElementById("terminal"));
+
+    // Load fit addon
+    const fitAddon = new FitAddon.FitAddon(); // If using CDN
+    term.loadAddon(fitAddon);
+
+    // Open and fit terminal
+    term.open(container);
+    fitAddon.fit();
     term.focus();
 
+    // Handle resizing
+    window.addEventListener("resize", () => {
+        fitAddon.fit();
+    });
+
+    // Connect to socket and start session
     socket = io();
 
     socket.emit("start_session", { alias, elevate });  // now dynamic
@@ -922,7 +937,8 @@ function insertSudoElevateUI(alias, details, requiresPassword = false) {
 
 function launchElevatedSession(alias) {
     try {
-        attach(alias, true); // open root shell via modal
+        attach(alias, true);
+        // open root shell via modal
     } catch (err) {
         console.error("Error launching elevated terminal:", err);
         alert("❌ Could not launch elevated shell.");
@@ -930,7 +946,7 @@ function launchElevatedSession(alias) {
 }
 
 function backgroundElevatedSession(alias) {
-    const name = prompt("Enter session name:", `${alias}_elevated`);
+    // const name = prompt("Enter session name:", `${alias}_elevated`);
     if (!name) return;
 
     fetch(`/api/start_elevated/${alias}?elevate=true&background=true&session_name=${encodeURIComponent(name)}`, {
@@ -940,8 +956,8 @@ function backgroundElevatedSession(alias) {
     .then(data => {
         if (data.error) {
             alert(`❌ ${data.error}`);
-        } else {
-            alert(`✅ Background session '${name}' started.`);
-        }
+        } // else {
+        //    alert(`✅ Background session '${name}' started.`);
+        //}
     });
 }

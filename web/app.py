@@ -291,6 +291,17 @@ def get_profiles():
     return jsonify(profiles)
 '''
 
+def forward_output(alias, channel):
+    try:
+        while True:
+            if channel.recv_ready():
+                output = channel.recv(1024).decode(errors="ignore")
+                socketio.emit("output", output, room=sid)
+                session_logs[alias].append(output)
+            socketio.sleep(0.1)
+    except Exception as e:
+        socketio.emit("output", f"\n[!] Reattach failed: {e}\n", room=sid)
+
 @socketio.on("attach")
 def handle_attach(data):
     alias = data.get("alias")
@@ -304,21 +315,9 @@ def handle_attach(data):
         for line in session_logs.get(alias, []):
             socketio.emit("output", line, room=sid)
 
-        def forward_output():
-            try:
-                while True:
-                    if channel.recv_ready():
-                        output = channel.recv(1024).decode(errors="ignore")
-                        socketio.emit("output", output, room=sid)
-                        session_logs[alias].append(output)
-                    socketio.sleep(0.1)
-            except Exception as e:
-                socketio.emit("output", f"\n[!] Reattach failed: {e}\n", room=sid)
-
-        socketio.start_background_task(target=forward_output)
+        socketio.start_background_task(target=forward_output(alias, channel))
     else:
         emit("output", f"\n[!] No background session found for alias: {alias}\n")
-
 
 @app.route("/api/profiles", methods=["GET"])
 def get_profiles():
@@ -422,19 +421,7 @@ def reattach_session(data):
         for line in session_logs.get(alias, []):
             socketio.emit('shell_output', {'output': line}, to=sid)
 
-        def forward_output():
-            try:
-                while True:
-                    rlist, _, _ = select.select([channel], [], [], 0.1)
-                    if channel in rlist:
-                        output = channel.recv(1024).decode()
-                        if output:
-                            session_logs[alias].append(output)
-                            socketio.emit('shell_output', {'output': output}, to=sid)
-            except Exception as e:
-                print(f"Error during reattach forward_output: {e}")
-
-        thread = threading.Thread(target=forward_output)
+        thread = threading.Thread(target=forward_output(alias, channel))
         thread.daemon = True
         thread.start()
 
