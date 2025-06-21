@@ -294,6 +294,7 @@ def get_profiles():
 @socketio.on("attach")
 def handle_attach(data):
     alias = data.get("alias")
+    elevate = data.get("elevate", False) in [True, "true", "1"]
     sid = request.sid
 
     if alias in background_sessions:

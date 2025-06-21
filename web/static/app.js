@@ -32,24 +32,28 @@ Sudo access: ${data.has_sudo ? '✅ YES' : '❌ NO'}
 
 
 function checkAndShowSudo(alias) {
-    console.log("Checking sudo for", alias);
     fetch(`/api/profiles/${alias}/introspect`)
         .then(res => res.json())
         .then(data => {
-            const el = document.getElementById(`sudo-test-${alias}`);
-            if (!el) return;
+            const testEl = document.getElementById(`sudo-test-${alias}`);
+            const actionEl = document.getElementById(`sudo-actions-${alias}`);
+            if (!testEl || !actionEl) return;
 
             if (data.error) {
-                el.innerHTML = `❌ ${data.error}`;
+                testEl.innerHTML = `❌ ${data.error}`;
+                actionEl.classList.add("d-none");
             } else if (data.has_sudo) {
-                insertSudoElevateUI(alias, data.sudo_details || "Sudo available");
+                testEl.innerHTML = `✅ ${data.sudo_details || "passwordless sudo available"}`;
+                insertSudoElevateUI(alias);  // inserts into actionEl
+                actionEl.classList.remove("d-none");
             } else {
-                el.innerHTML = `⚠️ ${data.sudo_details || "No sudo access"}`;
+                testEl.innerHTML = `⚠️ ${data.sudo_details || "No sudo access"}`;
+                actionEl.classList.add("d-none");
             }
         })
         .catch(err => {
-            const el = document.getElementById(`sudo-test-${alias}`);
-            if (el) el.innerHTML = "❌ Failed to check sudo.";
+            const testEl = document.getElementById(`sudo-test-${alias}`);
+            if (testEl) testEl.innerHTML = "❌ Failed to check sudo.";
         });
 }
 
@@ -232,10 +236,17 @@ function checkRemoteProfile(alias) {
                                 <div class="d-flex justify-content-between mt-1 mb-2">
                                     <div id="status-health-${alias}">🔄 Checking...</div>
                                     <div id="status-connect-${alias}">🔄 Checking...</div>
-                                    <div id="sudo-test-${alias}" class="mt-2 text-warning"> 🔄 Checking ...</div>
                                 </div>
 
                                 <div id="status-profile-${alias}" style="${isConnected ? 'display:inline-block;' : 'display:none;'}" class="text-info small">🔄 Checking...</div>
+
+                                <button></button>
+
+                                <div>
+                                    <div id="sudo-test-${alias}" class="mt-2 text-warning small">🔄 Checking ...</div>
+                                    <div id="sudo-actions-${alias}" class="d-none mt-2"></div>
+                                </div>
+
                                 <button></button>
 
                                 <div class="mt-2 d-grid gap-2">
@@ -876,13 +887,20 @@ function executeBase64Script(alias, rawScript) {
 }
 
 
-function insertSudoElevateUI(alias, details) {
-    const el = document.getElementById(`sudo-test-${alias}`);
+
+function insertSudoElevateUI(alias) {
+    const el = document.getElementById(`sudo-actions-${alias}`);
     if (!el) return;
+
     el.innerHTML = `
-        ✅ ${details}<br>
-        <a href="#" class="text-warning" onclick="launchElevatedSession('${alias}')">🚀 Launch Elevated</a>
-        <button class="btn btn-sm btn-outline-warning ms-2" onclick="backgroundElevatedSession('${alias}')">⬇ Background</button>
+        <div class="d-flex gap-2">
+            <a href="#" class="btn btn-sm btn-outline-warning" onclick="launchElevatedSession('${alias}')">
+                🚀 Launch
+            </a>
+            <button class="btn btn-sm btn-outline-warning" onclick="backgroundElevatedSession('${alias}')">
+                ⬇ Background
+            </button>
+        </div>
     `;
 }
 
@@ -895,7 +913,7 @@ function launchElevatedSession(alias) {
             } else {
                 alert("✅ Elevated session started.");
                 insertSudoElevateUI(alias, "Elevated root shell created.");
-                attack(alias);
+                attach(alias);
             }
         })
         .catch(err => {
