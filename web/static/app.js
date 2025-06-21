@@ -31,6 +31,65 @@ Sudo access: ${data.has_sudo ? '✅ YES' : '❌ NO'}
 }
 
 
+function checkAndShowSudo(alias) {
+    console.log("Checking sudo for", alias);
+    fetch(`/api/profiles/${alias}/introspect`)
+        .then(res => res.json())
+        .then(data => {
+            const el = document.getElementById(`sudo-test-${alias}`);
+            if (!el) return;
+
+            if (data.error) {
+                el.innerHTML = `❌ ${data.error}`;
+            } else if (data.has_sudo) {
+                insertSudoElevateUI(alias, data.sudo_details || "Sudo available");
+            } else {
+                el.innerHTML = `⚠️ ${data.sudo_details || "No sudo access"}`;
+            }
+        })
+        .catch(err => {
+            const el = document.getElementById(`sudo-test-${alias}`);
+            if (el) el.innerHTML = "❌ Failed to check sudo.";
+        });
+}
+
+function updateConnectionStatus(alias) {
+    fetch(`/api/status/${alias}`)
+        .then(res => res.json())
+        .then(data => {
+            const statusEl = document.getElementById(`status-connect-${alias}`);
+            const lastSeenEl = document.getElementById(`last-seen-${alias}`);
+            const button = document.getElementById(`toggle-btn-${alias}`);
+
+            if (!statusEl) return;
+
+            if (data.connected) {
+                statusEl.innerHTML = '🔌 <span style="color:deepskyblue">Connected</span>';
+                if (lastSeenEl) lastSeenEl.style.display = "none";
+                if (button) {
+                    button.classList.remove("btn-primary");
+                    button.classList.add("btn-danger");
+                    button.textContent = "Disconnect";
+                }
+            } else {
+                statusEl.innerHTML = '❌ <span style="color:gray">Not Connected</span>';
+                if (lastSeenEl) lastSeenEl.style.display = "inline";
+                if (button) {
+                    button.classList.remove("btn-danger");
+                    button.classList.add("btn-primary");
+                    button.textContent = "Connect";
+                }
+            }
+        })
+        .catch(() => {
+            const statusEl = document.getElementById(`status-connect-${alias}`);
+            if (statusEl) {
+                statusEl.innerHTML = '⚠️ <span style="color:red">Error</span>';
+            }
+        });
+}
+
+
 function checkHealthStatus(alias) {
     const el = document.getElementById(`status-health-${alias}`);
     if (el) {
@@ -145,7 +204,8 @@ function checkRemoteProfile(alias) {
                             const isConnected = status.connected === true;
 
                             if (isConnected) {
-                                checkRemoteProfile(alias)
+                                checkRemoteProfile(alias);
+                                checkAndShowSudo(alias);
                             }
                             const col = document.createElement("div");
                             col.className = "col-12 col-sm-6 col-md-4 col-lg-3 d-flex align-items-stretch";
@@ -170,10 +230,9 @@ function checkRemoteProfile(alias) {
                                 ${lastSeen}
                                 <hr>
                                 <div class="d-flex justify-content-between mt-1 mb-2">
-
                                     <div id="status-health-${alias}">🔄 Checking...</div>
                                     <div id="status-connect-${alias}">🔄 Checking...</div>
-                                    <div id="sudo-test-{{ alias }}" class="mt-2 text-warning"> 🔄 Checking ...</div>
+                                    <div id="sudo-test-${alias}" class="mt-2 text-warning"> 🔄 Checking ...</div>
                                 </div>
 
                                 <div id="status-profile-${alias}" style="${isConnected ? 'display:inline-block;' : 'display:none;'}" class="text-info small">🔄 Checking...</div>
@@ -265,7 +324,10 @@ function checkRemoteProfile(alias) {
                             checkConnectionStatus(alias);
                             setInterval(() => checkHealthStatus(alias), 60000);
                             setInterval(() => checkConnectionStatus(alias), 60000);
+
                         });
+
+                updateConnectionStatus(alias);
                 });
             });
     }
@@ -817,7 +879,6 @@ function executeBase64Script(alias, rawScript) {
 function insertSudoElevateUI(alias, details) {
     const el = document.getElementById(`sudo-test-${alias}`);
     if (!el) return;
-
     el.innerHTML = `
         ✅ ${details}<br>
         <a href="#" class="text-warning" onclick="launchElevatedSession('${alias}')">🚀 Launch Elevated</a>
@@ -833,7 +894,13 @@ function launchElevatedSession(alias) {
                 alert(`❌ ${data.error}`);
             } else {
                 alert("✅ Elevated session started.");
+                insertSudoElevateUI(alias, "Elevated root shell created.");
+                attack(alias);
             }
+        })
+        .catch(err => {
+            console.error("Error launching elevated session:", err);
+            alert("❌ Could not start elevated session.");
         });
 }
 

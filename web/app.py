@@ -145,8 +145,12 @@ def start_elevated_session(alias):
     session_name = request.args.get("session_name") or f"{alias}_elevated"
 
     try:
-        ssh_mgr.start_session(alias, profile, elevate=elevate, background=background, session_name=session_name)
+
+        result = ssh_mgr.start_session(alias, profile, elevate=elevate, background=background, session_name=session_name)
+        if isinstance(result, str) and result.startswith("ERROR"):
+            return jsonify({"error": result}), 403
         return jsonify({"message": f"Elevated session started for {alias}"}), 200
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -349,7 +353,20 @@ def start_session(data):
             )
             client = ssh_mgr.sessions[alias]
             channel = client.invoke_shell()
-            background_sessions[alias] = channel
+
+        if elevate:
+            channel.send("sudo -i\n")
+            time.sleep(1)
+            output = ""
+            if channel.recv_ready():
+                output = channel.recv(1024).decode("utf-8", errors="ignore")
+                if "password" in output.lower():
+                    return "ERROR: sudo elevation failed or requires password"
+
+        self.shells[alias] = channel
+        return "OK"
+
+        background_sessions[alias] = channel
 
         active_channels[sid] = channel
 

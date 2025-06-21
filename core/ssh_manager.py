@@ -16,7 +16,7 @@ class SSHManager:
         self.sessions = {}  # key: alias, value: paramiko.SSHClient
         self.shells = {}  # key: alias, value: invoke_shell() channel
 
-    def start_session(self, alias, config):
+    def start_session(self, alias, config, elevate=False, background=False, session_name=None):
         """
         Starts a new SSH session in a separate xterm window based on the provided configuration.
 
@@ -25,7 +25,7 @@ class SSHManager:
             config (dict): A dictionary containing SSH connection parameters and options.
         """
 
-        port = config.get("port", 22)
+        port = config.get("port", str(22))
         username = config.get("username")
         host = config.get("host")
 
@@ -37,7 +37,7 @@ class SSHManager:
         if jump:
             #cmd += ["-o", f"ProxyCommand=ssh -W %h:%p {jump}"]
             cmd.append("-J")
-            cmd.append(jump)
+            cmd.append(str(jump))
 
         key_text = config.get("key_text", "").strip()
         key_file = config.get("key_file")
@@ -48,57 +48,51 @@ class SSHManager:
                 keyfile.write(key_text)
             os.chmod(temp_key_path, 0o600)
             cmd.append("-i")
-            cmd.append(temp_key_path)
+            cmd.append(str(temp_key_path))
         elif key_file:
             cmd.append("-i")
-            cmd.append(key_file)
+            cmd.append(str(key_file))
 
         # Gateway ports
         if config.get("gatewayPorts"):
             cmd.append("-g")
-        print(" ".join(cmd))
         # Compression (-C)
         if config.get("compression"):
             cmd.append("-C")
-        print(" ".join(cmd))
         # Agent forwarding (-A)
         if config.get("agentForwarding"):
             cmd.append("-A")
-        print(" ".join(cmd))
         # X11 forwarding (-X)
         if config.get("x11Forwarding"):
             cmd.append("-X")
-        print(" ".join(cmd))
         # Local forwarding
         lf = config.get("localForward")
         if lf:
             cmd.append("-L")
-            cmd.append(lf)
-        print(" ".join(cmd))
+            cmd.append(str(lf))
         # Remote forwarding
         rf = config.get("remoteForward")
         if rf:
             cmd.append("-R")
-            cmd.append(rf)
+            cmd.append(str(rf))
         print(" ".join(cmd))
         # SOCKS5 proxy
         dp = config.get("socksProxy")
         if dp:
             cmd.append("-D")
-            cmd.append(dp)
+            cmd.append(str(dp))
         print(" ".join(cmd))
         # Custom -o options (space-separated list of Option=Value)
         custom_opts = config.get("customOptions", "")
         if custom_opts:
             for opt in custom_opts.strip().split():
                 cmd.append("-o")
-                cmd.append(opt)
+                cmd.append(str(opt))
         print(" ".join(cmd))
         # Add user@host and port
         cmd.append("-p")
-        cmd.append(port)
+        cmd.append(str(port))
         cmd.append(f"{username}@{host}")
-        print(" ".join(cmd))
 
         # Elevate via sudo -i if requested
         if elevate:
@@ -112,20 +106,6 @@ class SSHManager:
             subprocess.Popen(cmd)
         else:
             subprocess.run(cmd)
-
-
-
-        # log the cmd
-        '''
-        logging.info(f"[{alias}] Launching SSH command: {' '.join(cmd)}")
-        print(" ".join(cmd))
-
-        # Start the SSH session in a new xterm window
-        subprocess.Popen(cmd)
-        '''
-
-
-
 
 
     def attach_session(self, alias):
