@@ -356,9 +356,9 @@ def start_session(data):
             client = ssh_mgr.sessions[alias]
             channel = client.invoke_shell()
             background_sessions[alias] = channel
-            emit("shell_output", "[+] New SSH session started\n", to=sid)
-        else:
-            emit("shell_output", "[*] Reattaching to existing session\n", to=sid)
+       #     emit("shell_output", "[+] New SSH session started\n", to=sid)
+       # else:
+       #     emit("shell_output", "[*] Reattaching to existing session\n", to=sid)
 
         # Track session by socket sid
         active_channels[sid] = channel
@@ -395,7 +395,7 @@ def start_session(data):
             t.start()
             reader_threads[alias] = t
 
-        emit("shell_output", "[✓] Session attached and active\n", to=sid)
+        # emit("shell_output", "[✓] Session attached and active\n", to=sid)
 
     except Exception as e:
         emit("shell_output", f"[ERROR] {str(e)}\n", to=sid)

@@ -9,30 +9,9 @@ document.addEventListener("DOMContentLoaded", () => {
     tooltipTriggerList.forEach(el => new bootstrap.Tooltip(el));
 });
 
-function showIntrospection(alias) {
-    fetch(`/api/profiles/${alias}/introspect`)
-        .then(res => res.json())
-        .then(data => {
-            if (data.error) return alert("❌ " + data.error);
-
-            if (data.has_sudo) {
-                insertSudoElevateUI(alias, data.sudo_details);
-            }
-            const summary = `
-Alias: ${data.alias}
-------------------------
-${data.output}
-
-Sudo access: ${data.has_sudo ? '✅ YES' : '❌ NO'}
-            `.trim();
-
-            alert(summary);
-        });
-}
-
-
 function checkAndShowSudo(alias) {
     console.log("Checking sudo for", alias);
+
     fetch(`/api/profiles/${alias}/introspect`)
         .then(res => res.json())
         .then(data => {
@@ -42,7 +21,17 @@ function checkAndShowSudo(alias) {
             if (data.error) {
                 el.innerHTML = `❌ ${data.error}`;
             } else if (data.has_sudo) {
-                insertSudoElevateUI(alias, data.sudo_details || "Sudo available");
+
+                const lowerDetails = (data.sudo_details || "").toLowerCase();
+                const requiresPassword = (
+                    /require.*password/.test(lowerDetails) &&
+                    !lowerDetails.includes("passwordless") &&
+                    !lowerDetails.includes("no password required") &&
+                    !lowerDetails.includes("nopasswd")
+                );
+
+                insertSudoElevateUI(alias, data.sudo_details, requiresPassword);
+
             } else {
                 el.innerHTML = `⚠️ ${data.sudo_details || "No sudo access"}`;
             }
@@ -76,7 +65,7 @@ function updateConnectionStatus(alias) {
                 if (lastSeenEl) lastSeenEl.style.display = "inline";
                 if (button) {
                     button.classList.remove("btn-danger");
-                    button.classList.add("btn-primary");
+                    button.classList.add("btn-outline-warning");
                     button.textContent = "Connect";
                 }
             }
@@ -139,7 +128,7 @@ function checkConnectionStatus(alias) {
                     togglebutton.textContent = "Disconnect";
                 } else {
                     togglebutton.classList.remove("btn-danger");
-                    togglebutton.classList.add("btn-primary");
+                    togglebutton.classList.add("btn-outline-warning");
                     togglebutton.textContent = "Connect";
                 }
 
@@ -232,27 +221,43 @@ function checkRemoteProfile(alias) {
                                     ${jumpInfo}
                                     ${lastSeen}
                                 </div>
-                                <br>
-                                <hr>
-                                <!-- Connect / Disconnect -->
-                                <button id="toggle-btn-${alias}" class="btn btn-sm ${isConnected ? 'btn-danger' : 'btn-primary'}"
-                                    onclick="toggleConnection('${alias}', this)"
-                                    data-bs-toggle="tooltip"
-                                    title="${isConnected ? 'Disconnect from this host' : 'Establish an SSH connection'}">
-                                    ${isConnected ? 'Disconnect' : 'Connect'}
-                                </button>
 
-                                <br>
-
-                                <hr>
                                 <div class="d-flex justify-content-between mt-1 mb-2">
                                     <div id="status-health-${alias}">🔄 Checking...</div>
                                     <div id="status-connect-${alias}">🔄 Checking...</div>
                                 </div>
 
-                                <div id="status-profile-${alias}" style="${isConnected ? 'display:inline-block;' : 'display:none;'}" class="text-info small">🔄 Checking...</div>
+                                <div class="d-flex justify-content-start gap-2">
+                                    <!-- Connect / Disconnect -->
+                                    <button id="toggle-btn-${alias}" class="btn btn-sm ${isConnected ? 'btn-danger' : 'btn-primary'}"
+                                        onclick="toggleConnection('${alias}', this)"
+                                        data-bs-toggle="tooltip"
+                                        title="${isConnected ? 'Disconnect from this host' : 'Establish an SSH connection'}">
+                                        ${isConnected ? 'Disconnect' : 'Connect'}
+                                    </button>
+                                    <!-- Edit Profile -->
+                                    <button class="btn btn-sm btn-outline-light"
+                                        onclick="editProfile('${alias}')"
+                                        data-bs-toggle="tooltip"
+                                        title="Edit this SSH profile">
+                                        ✏️ Edit Profile
+                                    </button>
+
+                                </div>
+                                <br>
+                                <div class="d-flex gap-2">
+                                    <!-- Show SSH Details -->
+                                    <button class="btn btn-sm btn-light w-100"
+                                        onclick="showDetails('${alias}')"
+                                        data-bs-toggle="tooltip"
+                                        title="View the SSH command and connection details">
+                                        🔍 Details
+                                    </button>
+                                </div>
 
                                 <button></button>
+
+                                <div id="status-profile-${alias}" style="${isConnected ? 'display:inline-block;' : 'display:none;'}" class="text-info small">🔄 Checking...</div>
 
                                 <br>
                                 <div>
@@ -263,24 +268,6 @@ function checkRemoteProfile(alias) {
                                 <button></button>
 
                                 <div class="mt-2 d-grid gap-2">
-
-                                    <!-- Show SSH Details -->
-                                    <button class="btn btn-sm btn-light w-100"
-                                        onclick="showDetails('${alias}')"
-                                        data-bs-toggle="tooltip"
-                                        title="View the SSH command and connection details">
-                                        🔍 Details
-                                    </button>
-
-                                    <!-- Edit Profile -->
-                                    <button class="btn btn-sm btn-outline-light me-2 w-100"
-                                        onclick="editProfile('${alias}')"
-                                        data-bs-toggle="tooltip"
-                                        title="Edit this SSH profile">
-                                        ✏️ Edit
-                                    </button>
-
-                                    <button></button>
 
                                     <!-- Attach (Terminal) -->
                                     <button id="attach-btn-${alias}" class="btn btn-sm btn-warning me-2 w-100"
@@ -553,7 +540,7 @@ function toggleConnection(alias, button) {
 
                         button.classList.remove("btn-danger");
                         button.classList.add("btn-primary");
-                        button.textContent = "Connect";
+                        button.textContent = "Connect to";
 
                         refreshProfiles();
 
@@ -878,6 +865,8 @@ function promptAndSendScript(alias) {
 }
 
 
+
+
 function executeBase64Script(alias, rawScript) {
     const b64script = btoa(rawScript);
     fetch("/api/execute_b64", {
@@ -900,14 +889,33 @@ function executeBase64Script(alias, rawScript) {
 }
 
 
-function insertSudoElevateUI(alias, details) {
+function insertSudoElevateUI(alias, details, requiresPassword = false) {
     const el = document.getElementById(`sudo-test-${alias}`);
     if (!el) return;
-    el.innerHTML = `
-        ✅ ${details}<br>
-        <button class="btn btn-sm btn-outline-warning ms-2" onclick="openTerminal('${alias}', true)">🚀 Root Shell</button>
-        <button class="btn btn-sm btn-outline-warning ms-2" onclick="backgroundElevatedSession('${alias}')">⬇ Background</button>
+    const checkbox = `<input class="form-check-input" type="checkbox" disabled ${requiresPassword ? "" : "checked"}>`;
+    const label = `<label class="form-check-label ${requiresPassword ? "text-warning" : "text-success"}">
+        ${requiresPassword ? "⚠️ Password required" : "✅ No password"}
+    </label>`;
 
+    el.innerHTML = `
+        <div class="p-2 mt-2 rounded border border-warning bg-dark text-white">
+            <div class="form-check mb-2">
+                ${checkbox}
+                ${label}
+            </div>
+
+            <div class="d-flex gap-2 justify-content-start">
+                <button class="btn btn-sm btn-dark btn-outline-warning"
+                    onclick="openTerminal('${alias}', true)">
+                    🖥️ Terminal
+                </button>
+
+                <button class="btn btn-sm btn-dark btn-outline-warning"
+                    onclick="backgroundElevatedSession('${alias}')">
+                    ⬇ Detached
+                </button>
+            </div>
+        </div>
     `;
 }
 
@@ -936,11 +944,4 @@ function backgroundElevatedSession(alias) {
             alert(`✅ Background session '${name}' started.`);
         }
     });
-}
-
-
-
-function closeTerminal() {
-    if (term) term.dispose();
-    document.getElementById("terminalModal").style.display = "none";
 }
